@@ -1,0 +1,784 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'api_service.dart';
+import 'location.dart';
+import 'dealer.dart';
+import 'month.dart';
+import 'index.dart';
+
+class CollectionPlanPage extends StatefulWidget {
+  final String username;
+  final String password;
+  final LoginDetails? initialLoginDetails;
+  final int? stateId;
+
+  const CollectionPlanPage({
+    super.key,
+    required this.username,
+    required this.password,
+    this.initialLoginDetails,
+    this.stateId,
+  });
+
+  @override
+  State<CollectionPlanPage> createState() => _CollectionPlanPageState();
+}
+
+class _CollectionPlanPageState extends State<CollectionPlanPage> {
+  final ApiService _apiService = ApiService();
+  final GlobalKey<FormState> _formKey = GlobalKey();
+  final List<String> categories = ['Select Categories', 'Diamond', 'Golden'];
+
+  String? stateName;
+  String? usernameFromLogin;
+  int? branchId;
+  int? stateId;
+
+  String? selectedCategory = 'Select Categories';
+  Location? selectedLocation;
+  Dealer? selectedDealer;
+  Month? selectedMonth;
+
+  bool isLoading = true;
+  bool isSaving = false;
+  List<Location> locations = [];
+  List<Dealer> dealers = [];
+  List<Month> months = [];
+  List<Map<String, dynamic>> dealerOutstandingList = [];
+  List<TextEditingController> firstHalfControllers = [];
+  List<TextEditingController> secondHalfControllers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeData();
+  }
+
+  void _initializeData() {
+    if (widget.stateId != null) {
+      stateId = widget.stateId;
+      fetchLocations(widget.stateId!);
+    }
+    
+    if (widget.initialLoginDetails != null) {
+      _handleLoginDetails(widget.initialLoginDetails!);
+    } else if (widget.stateId == null) {
+      fetchLoginAndState();
+    }
+    
+    fetchMonths();
+  }
+
+  @override
+  void dispose() {
+    _cleanupControllers();
+    super.dispose();
+  }
+
+  void _cleanupControllers() {
+    for (var c in [...firstHalfControllers, ...secondHalfControllers]) {
+      c.dispose();
+    }
+  }
+
+  void _handleLoginDetails(LoginDetails loginData) {
+    setState(() {
+      usernameFromLogin = loginData.userName;
+      branchId = loginData.brnchId;
+      stateId ??= loginData.stateId;
+      stateName = loginData.stateName;
+      isLoading = false;
+    });
+    fetchLocations(loginData.stateId);
+  }
+
+  Future<void> fetchMonths() async {
+    try {
+      final monthList = await _apiService.getMonthDetails();
+      if (mounted) {
+        setState(() => months = monthList);
+      }
+    } catch (e) {
+      _showError('Error fetching months: ${e.toString()}');
+    }
+  }
+
+  Future<void> fetchLoginAndState() async {
+    try {
+      final LoginDetails? loginData = await _apiService.login(
+        widget.username, 
+        widget.password
+      ).timeout(const Duration(seconds: 30));
+      
+      if (loginData != null && mounted) {
+        _handleLoginDetails(loginData);
+      } else {
+        _showError('Login failed: No login data received');
+      }
+    } catch (e) {
+      _showError('Error fetching login data: ${e.toString()}');
+    }
+  }
+
+  Future<void> fetchLocations(int stateId) async {
+    try {
+      final locationList = await _apiService.getLocationDetails(stateId)
+        .timeout(const Duration(seconds: 30));
+      
+      if (mounted) {
+        setState(() {
+          locations = locationList;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      _showError('Error fetching locations: ${e.toString()}');
+    }
+  }
+
+  Future<void> fetchDealers() async {
+    if (selectedLocation == null || 
+        selectedCategory == 'Select Categories' || 
+        selectedMonth == null) {
+      _resetDealerData();
+      return;
+    }
+
+    try {
+      final List<Dealer> dealerList = await _apiService.getDealerListDetails(
+        selectedLocation!.loctId.toString(),
+        selectedCategory == 'Diamond' ? '1' : '2',
+        selectedMonth!.monthId.toString(),
+      ).timeout(const Duration(seconds: 30));
+
+      if (mounted) {
+        setState(() {
+          dealers = dealerList;
+          if (selectedDealer != null && 
+              !dealers.any((d) => d.cateId == selectedDealer!.cateId)) {
+            _resetDealerData();
+          }
+        });
+      }
+    } catch (e) {
+      _showError('Error fetching dealers: ${e.toString()}');
+      _resetDealerData();
+    }
+  }
+
+  Future<void> fetchDealerOutstanding() async {
+    if (selectedDealer == null) {
+      _resetDealerData();
+      return;
+    }
+
+    try {
+      final data = await _apiService.getDealerOutstandingDetails(
+        selectedDealer!.cateId.toString()
+      ).timeout(const Duration(seconds: 30));
+
+      if (mounted) {
+        setState(() {
+          dealerOutstandingList = List<Map<String, dynamic>>.from(data['myRoot'] ?? []);
+          _initializeAmountControllers();
+        });
+      }
+    } catch (e) {
+      _showError('Error fetching dealer outstanding: ${e.toString()}');
+      _resetDealerData();
+    }
+  }
+
+  Future<void> saveCollectionPlan() async {
+    if (!_validateForm()) return;
+
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Save'),
+        content: const Text('Are you sure you want to save this collection plan?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Yes'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => isSaving = true);
+
+    try {
+      final requestBody = _buildRequestBody();
+      debugPrint('Sending to API: ${jsonEncode(requestBody)}');
+      
+      final response = await _apiService.saveCollectionPlan(requestBody);
+      debugPrint('API Response: ${response.toString()}');
+
+      if (mounted) {
+        if (response['Message']?.toString().toLowerCase().contains('success') ?? false) {
+          await _showSuccessDialog();
+          _navigateToIndexPage();
+        } else {
+          _showError(response['Message'] ?? 'Failed to save collection plan');
+        }
+      }
+    } catch (e) {
+      _showError('Error saving collection plan: ${e.toString()}');
+    } finally {
+      if (mounted) {
+        setState(() => isSaving = false);
+      }
+    }
+  }
+
+  Map<String, dynamic> _buildRequestBody() {
+    return {
+      "dealer": {
+        "cateId": selectedDealer!.cateId,
+        "cateName": selectedDealer!.cateName,
+        "brnchid": branchId!,
+        "monthid": selectedMonth!.monthId,
+        "cusrid": usernameFromLogin ?? widget.username,
+      },
+      "outstandingDetails": dealerOutstandingList.asMap().entries.map((entry) {
+        final index = entry.key;
+        final item = entry.value;
+        
+        return {
+          "TRANMID": item['TRANMID'],
+          "TRANDNO": item['TRANDNO'].toString(),
+          "TRANDATE": item['TRANDATE'].toString(),
+          "TRANNAMT": _convertToDouble(item['TRANNAMT']),
+          "TRANPAMT": _convertToDouble(item['TRANPAMT']),
+          "TRANODAYS": item['OverDueDays'] ?? 0,
+          "firstHalfAmount": _parseAmount(firstHalfControllers[index].text) ?? 0.0,
+          "secondHalfAmount": _parseAmount(secondHalfControllers[index].text) ?? 0.0,
+        };
+      }).toList(),
+    };
+  }
+
+  double _convertToDouble(dynamic value) {
+    return value is int ? value.toDouble() : (value as double);
+  }
+
+  double? _parseAmount(String text) {
+    return text.trim().isEmpty ? null : double.tryParse(text.trim());
+  }
+
+  Future<void> _showSuccessDialog() async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Success'),
+        content: const Text('Data sent successfully!'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _navigateToIndexPage();
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _navigateToIndexPage() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (context) => IndexPage(loginDetails: widget.initialLoginDetails),
+      ),
+      (route) => false,
+    );
+  }
+
+  void _resetDealerData() {
+    if (mounted) {
+      setState(() {
+        dealers = [];
+        selectedDealer = null;
+        dealerOutstandingList = [];
+        _clearAmountControllers();
+      });
+    }
+  }
+
+  void _initializeAmountControllers() {
+    _clearAmountControllers();
+    firstHalfControllers = List.generate(
+      dealerOutstandingList.length, 
+      (_) => TextEditingController()
+    );
+    secondHalfControllers = List.generate(
+      dealerOutstandingList.length, 
+      (_) => TextEditingController()
+    );
+  }
+
+  void _clearAmountControllers() {
+    _cleanupControllers();
+    firstHalfControllers = [];
+    secondHalfControllers = [];
+  }
+
+  void _showError(String message) {
+    debugPrint(message);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message))
+      );
+      setState(() => isLoading = false);
+    }
+  }
+
+  bool _validateForm() {
+    if (selectedLocation == null || 
+        selectedCategory == 'Select Categories' || 
+        selectedMonth == null || 
+        selectedDealer == null) {
+      _showError('Please select all required fields');
+      return false;
+    }
+
+    bool hasValidAmounts = true;
+    
+    for (int i = 0; i < dealerOutstandingList.length; i++) {
+      final firstHalfText = firstHalfControllers[i].text.trim();
+      final secondHalfText = secondHalfControllers[i].text.trim();
+      
+      // Check if both are empty or both have values
+      if ((firstHalfText.isEmpty && secondHalfText.isNotEmpty) || 
+          (firstHalfText.isNotEmpty && secondHalfText.isEmpty)) {
+        _showError('Please fill both amounts or leave both empty for invoice ${dealerOutstandingList[i]['TRANDNO']}');
+        hasValidAmounts = false;
+        break;
+      }
+      
+      // Validate if inputs are valid numbers
+      final double? firstHalf = _parseAmount(firstHalfText);
+      final double? secondHalf = _parseAmount(secondHalfText);
+
+      if (firstHalfText.isNotEmpty && firstHalf == null) {
+        _showError('Please enter a valid number for First Half amount for invoice ${dealerOutstandingList[i]['TRANDNO']}');
+        hasValidAmounts = false;
+        break;
+      }
+      if (secondHalfText.isNotEmpty && secondHalf == null) {
+        _showError('Please enter a valid number for Second Half amount for invoice ${dealerOutstandingList[i]['TRANDNO']}');
+        hasValidAmounts = false;
+        break;
+      }
+
+      // If both are filled, apply the sum validation
+      if (firstHalf != null && secondHalf != null) {
+        final totalEnteredAmount = firstHalf + secondHalf;
+        final trannamt = _convertToDouble(dealerOutstandingList[i]['TRANNAMT']);
+
+        if (totalEnteredAmount > trannamt) {
+          _showError('The sum of First Half and Second Half amounts for invoice ${dealerOutstandingList[i]['TRANDNO']} cannot exceed the Total Amount (₹${trannamt.toStringAsFixed(2)})');
+          hasValidAmounts = false;
+          break;
+        }
+      }
+    }
+
+    return hasValidAmounts;
+  }
+
+  // _validateAmount is no longer strictly needed as its logic is merged into _validateForm
+  // bool _validateAmount(String value, String fieldName) {
+  //   if (value.isNotEmpty && double.tryParse(value) == null) {
+  //     _showError('Please enter valid numbers in $fieldName amounts');
+  //     return false;
+  //   }
+  //   return true;
+  // }
+
+  String _formatDate(dynamic date) {
+    if (date == null) return 'N/A';
+    try {
+      return DateFormat('dd-MM-yyyy').format(DateTime.parse(date.toString()));
+    } catch (e) {
+      return 'Invalid Date';
+    }
+  }
+
+  Widget _buildHeader() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(children: [
+            const Icon(Icons.calendar_today, color: Colors.blue),
+            const SizedBox(width: 12),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('2025 - 2026', style: Theme.of(context).textTheme.titleLarge),
+              Text('Set Collection Target', style: Theme.of(context).textTheme.bodyMedium),
+            ]),
+          ]),
+        ),
+        const SizedBox(height: 16),
+        _buildInfoCard('State', stateName ?? 'Loading...', Icons.location_on),
+        const SizedBox(height: 16),
+        _buildInfoCard('Branch ID', branchId?.toString() ?? 'Loading...', Icons.apartment),
+      ],
+    );
+  }
+
+  Widget _buildInfoCard(String label, String value, IconData icon) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(children: [
+          Icon(icon, color: Colors.grey),
+          const SizedBox(width: 12),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+            const SizedBox(height: 4),
+            Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          ]),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildSelectionSection() {
+    return Column(children: [
+      _buildSectionTitle('Select Dealer Details'),
+      const SizedBox(height: 12),
+      Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.grey.shade200),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(children: [
+            _buildDropdown<Location>(
+              label: 'Location',
+              value: selectedLocation,
+              items: [Location(loctId: '0', loctDesc: 'Select Location'), ...locations],
+              displayText: (loc) => loc?.loctDesc ?? '',
+              onChanged: (newValue) {
+                setState(() {
+                  selectedLocation = newValue?.loctId == '0' ? null : newValue;
+                  _resetDealerData();
+                  fetchDealers();
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            _buildDropdown<String>(
+              label: 'Category',
+              value: selectedCategory,
+              items: categories,
+              displayText: (item) => item ?? '',
+              onChanged: (newValue) {
+                setState(() {
+                  selectedCategory = newValue;
+                  _resetDealerData();
+                  fetchDealers();
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            _buildDropdown<Month>(
+              label: 'Month',
+              value: selectedMonth,
+              items: [Month(monthId: 0, monthDesc: 'Select Month', dispOrder: 0), ...months],
+              displayText: (month) => month?.monthDesc ?? '',
+              onChanged: (newValue) {
+                setState(() {
+                  selectedMonth = newValue?.monthId == 0 ? null : newValue;
+                  _resetDealerData();
+                  fetchDealers();
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            _buildDropdown<Dealer>(
+              label: 'Dealer',
+              value: selectedDealer,
+              items: [Dealer(cateId: 0, cateName: 'Select Dealer', creditPeriod: 0), ...dealers],
+              displayText: (dealer) => dealer?.cateName ?? '',
+              onChanged: (newValue) async {
+                setState(() => selectedDealer = newValue?.cateId == 0 ? null : newValue);
+                if (selectedDealer != null) await fetchDealerOutstanding();
+              },
+            ),
+          ]),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _buildDropdown<T>({
+    required String label,
+    required T? value,
+    required List<T> items,
+    required String Function(T?) displayText,
+    required void Function(T?) onChanged,
+  }) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: TextStyle(color: Colors.grey.shade700, fontSize: 14)),
+      const SizedBox(height: 8),
+      Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: DropdownButtonFormField<T>(
+          value: value,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            border: InputBorder.none,
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          ),
+          items: items.map((item) => DropdownMenuItem<T>(
+            value: item,
+            child: Text(displayText(item), overflow: TextOverflow.ellipsis),
+          )).toList(),
+          onChanged: onChanged,
+          validator: (value) => value == null || 
+              (value is Location && value.loctId == '0') ||
+              (value is Month && value.monthId == 0) ||
+              (value is Dealer && value.cateId == 0) ||
+              (value is String && value == 'Select Categories')
+              ? 'Please select a $label' : null,
+        ),
+      ),
+    ]);
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Row(children: [
+      Container(height: 24, width: 4, color: Colors.blue),
+      const SizedBox(width: 8),
+      Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+    ]);
+  }
+
+  Widget _buildOutstandingSection() {
+    return Column(children: [
+      _buildSectionTitle('Dealer Outstanding'),
+      const SizedBox(height: 12),
+      if (dealerOutstandingList.isEmpty) 
+        _buildEmptyState() 
+      else ...[
+        ...dealerOutstandingList.asMap().entries.map((entry) => 
+          _buildOutstandingItem(entry.key, entry.value)).toList(),
+        const SizedBox(height: 20),
+        _buildSaveButton(),
+      ],
+    ]);
+  }
+
+  Widget _buildSaveButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: isSaving ? null : saveCollectionPlan,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.blue,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: isSaving
+            ? const SizedBox(
+                height: 24,
+                width: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+            : const Text(
+                'Save Collection',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: const Padding(
+        padding: EdgeInsets.all(24),
+        child: Column(children: [
+          Icon(Icons.receipt_long, size: 48, color: Colors.grey),
+          SizedBox(height: 16),
+          Text('No outstanding records found', textAlign: TextAlign.center),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildOutstandingItem(int index, Map<String, dynamic> item) {
+    final totalAmount = (item['TRANNAMT'] as num).toDouble();
+    final paidAmount = (item['TRANPAMT'] as num).toDouble();
+    final overdueDays = item['OverDueDays'] ?? 0;
+    // The outstandingAmount variable is declared but not used in the UI.
+    // final outstandingAmount = totalAmount - paidAmount;
+
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('₹${totalAmount.toStringAsFixed(2)}',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue)),
+              const SizedBox(height: 4),
+              Text('Invoice: ${item['TRANDNO'] ?? 'N/A'}', style: TextStyle(color: Colors.grey.shade600)),
+            ]),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: overdueDays > 0 ? Colors.red.shade100 : Colors.green.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                overdueDays > 0 ? '$overdueDays days overdue' : 'On time',
+                style: TextStyle(
+                  color: overdueDays > 0 ? Colors.red.shade800 : Colors.green.shade800,
+                ),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          Row(children: [
+            _buildDateInfo(Icons.calendar_today, 'Inv: ${_formatDate(item['TRANDATE'])}'),
+            const SizedBox(width: 16),
+            _buildDateInfo(Icons.event, 'Due: ${_formatDate(item['DueDate'])}'),
+          ]),
+          const SizedBox(height: 16),
+          Row(children: [
+            Expanded(child: _buildAmountField(
+              controller: firstHalfControllers[index],
+              label: 'First Half',
+            )),
+            const SizedBox(width: 16),
+            Expanded(child: _buildAmountField(
+              controller: secondHalfControllers[index],
+              label: 'Second Half',
+            )),
+          ]),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildDateInfo(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.grey),
+        const SizedBox(width: 4),
+        Text(text, style: TextStyle(color: Colors.grey.shade600)),
+      ],
+    );
+  }
+
+  Widget _buildAmountField({
+    required TextEditingController controller,
+    required String label,
+  }) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: TextStyle(color: Colors.grey.shade600)),
+      const SizedBox(height: 8),
+      TextFormField(
+        controller: controller,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true), // Allow decimals
+        decoration: InputDecoration(
+          hintText: '0.00',
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        ),
+      ),
+    ]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      appBar: AppBar(
+        title: const Text('Collection Plan'),
+        centerTitle: true,
+        backgroundColor: Colors.blue.shade100,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.list),
+            onPressed: () => Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => IndexPage(loginDetails: widget.initialLoginDetails),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(),
+                    const SizedBox(height: 24),
+                    _buildSelectionSection(),
+                    if (selectedDealer != null) ...[
+                      const SizedBox(height: 24),
+                      _buildOutstandingSection(),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+}
