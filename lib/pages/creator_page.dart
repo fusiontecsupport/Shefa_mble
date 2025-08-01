@@ -588,6 +588,8 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
       if (dealerOutstandingList.isEmpty) 
         _buildEmptyState() 
       else ...[
+        _buildSummaryCard(),
+        const SizedBox(height: 16),
         ...dealerOutstandingList.asMap().entries.map((entry) => 
           _buildOutstandingItem(entry.key, entry.value)).toList(),
         const SizedBox(height: 20),
@@ -629,6 +631,281 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
     );
   }
 
+  Widget _buildSummaryCard() {
+    final totalBills = dealerOutstandingList.length;
+    final totalAmount = dealerOutstandingList.fold<double>(
+      0.0, 
+      (sum, item) => sum + _convertToDouble(item['TRANNAMT'])
+    );
+    
+    // Get credit period and outstanding due from first item (all are same)
+    final creditPeriod = dealerOutstandingList.isNotEmpty ? dealerOutstandingList.first['Cate_CrdtPrd'] ?? 0 : 0;
+    final oDueAmt = dealerOutstandingList.isNotEmpty ? (dealerOutstandingList.first['ODueAmt'] as num?)?.toDouble() ?? 0.0 : 0.0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white,
+            Colors.indigo.shade50,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.indigo.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Compact Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.indigo.shade400, Colors.purple.shade500],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.insights,
+                  size: 14,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Collection Summary',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${dealerOutstandingList.length} items',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.green.shade700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Single Row Stats
+          Row(
+            children: [
+              Expanded(
+                child: _buildCompactElegantStat(
+                  icon: Icons.receipt_long,
+                  value: '$totalBills',
+                  label: 'Bills',
+                  color: Colors.blue,
+                  gradient: [Colors.blue.shade400, Colors.blue.shade600],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildCompactElegantStat(
+                  icon: Icons.currency_rupee,
+                  value: '₹${totalAmount.toStringAsFixed(0)}',
+                  label: ' total Invoice Amount',
+                  color: Colors.teal,
+                  gradient: [Colors.teal.shade400, Colors.teal.shade600],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildCompactElegantStat(
+                  icon: Icons.access_time,
+                  value: '$creditPeriod',
+                  label: 'Days',
+                  color: Colors.purple,
+                  gradient: [Colors.purple.shade400, Colors.purple.shade600],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildCompactElegantStat(
+                  icon: Icons.account_balance_wallet,
+                  value: '₹${oDueAmt.toStringAsFixed(0)}',
+                  label: 'Outstanding Due',
+                  color: oDueAmt < 0 ? Colors.red : Colors.green,
+                  gradient: oDueAmt < 0 
+                    ? [Colors.red.shade400, Colors.red.shade600]
+                    : [Colors.green.shade400, Colors.green.shade600],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildElegantStat({
+    required IconData icon,
+    required String value,
+    required String label,
+    required String subtitle,
+    required Color color,
+    required List<Color> gradient,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradient,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.25),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  icon,
+                  size: 18,
+                  color: Colors.white,
+                ),
+              ),
+              const Spacer(),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withOpacity(0.95),
+            ),
+          ),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.white.withOpacity(0.8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactElegantStat({
+    required IconData icon,
+    required String value,
+    required String label,
+    required Color color,
+    required List<Color> gradient,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradient,
+        ),
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(
+                  icon,
+                  size: 12,
+                  color: Colors.white,
+                ),
+              ),
+              const Spacer(),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              color: Colors.white.withOpacity(0.9),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+
   Widget _buildEmptyState() {
     return Card(
       elevation: 0,
@@ -650,8 +927,6 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
   Widget _buildOutstandingItem(int index, Map<String, dynamic> item) {
     final totalAmount = (item['TRANNAMT'] as num).toDouble();
     final paidAmount = (item['TRANPAMT'] as num).toDouble();
-    // The outstandingAmount variable is declared but not used in the UI.
-    // final outstandingAmount = totalAmount - paidAmount;
 
     return Card(
       elevation: 0,
@@ -673,7 +948,7 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
           ]),
           const SizedBox(height: 12),
           Row(children: [
-            _buildDateInfo(Icons.calendar_today, 'Inv: ${_formatDate(item['TRANDATE'])}'),
+            Expanded(child: _buildDateInfo(Icons.calendar_today, 'Inv: ${_formatDate(item['TRANDATE'])}')),
           ]),
           const SizedBox(height: 16),
           Row(children: [
@@ -699,6 +974,95 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
         const SizedBox(width: 4),
         Text(text, style: TextStyle(color: Colors.grey.shade600)),
       ],
+    );
+  }
+
+  Widget _buildInfoChip({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: color.withOpacity(0.8),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryInfoChip({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: color.withOpacity(0.8),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
