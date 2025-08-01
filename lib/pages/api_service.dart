@@ -232,8 +232,8 @@ ${targets.map((t) => '''
     }
   }
 
-  Future<dynamic> getDealerOutstandingDetails(String cateId) async {
-    final url = Uri.parse('$_baseUrl/dealeroutstandingDetails?id=$cateId');
+  Future<dynamic> getDealerOutstandingDetails(String cateId, int branchId) async {
+    final url = Uri.parse('$_baseUrl/dealeroutstandingDetails?ids=$cateId~$branchId');
     _log('Dealer Outstanding Request: $url');
 
     try {

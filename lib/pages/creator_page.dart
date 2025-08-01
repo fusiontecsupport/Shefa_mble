@@ -175,7 +175,8 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
 
     try {
       final data = await _apiService.getDealerOutstandingDetails(
-        selectedDealer!.cateId.toString()
+        selectedDealer!.cateId.toString(),
+        branchId!
       ).timeout(const Duration(seconds: 30));
 
       if (mounted) {
@@ -649,7 +650,6 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
   Widget _buildOutstandingItem(int index, Map<String, dynamic> item) {
     final totalAmount = (item['TRANNAMT'] as num).toDouble();
     final paidAmount = (item['TRANPAMT'] as num).toDouble();
-    final overdueDays = item['OverDueDays'] ?? 0;
     // The outstandingAmount variable is declared but not used in the UI.
     // final outstandingAmount = totalAmount - paidAmount;
 
@@ -670,25 +670,10 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
               const SizedBox(height: 4),
               Text('Invoice: ${item['TRANDNO'] ?? 'N/A'}', style: TextStyle(color: Colors.grey.shade600)),
             ]),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: overdueDays > 0 ? Colors.red.shade100 : Colors.green.shade100,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                overdueDays > 0 ? '$overdueDays days overdue' : 'On time',
-                style: TextStyle(
-                  color: overdueDays > 0 ? Colors.red.shade800 : Colors.green.shade800,
-                ),
-              ),
-            ),
           ]),
           const SizedBox(height: 12),
           Row(children: [
             _buildDateInfo(Icons.calendar_today, 'Inv: ${_formatDate(item['TRANDATE'])}'),
-            const SizedBox(width: 16),
-            _buildDateInfo(Icons.event, 'Due: ${_formatDate(item['DueDate'])}'),
           ]),
           const SizedBox(height: 16),
           Row(children: [
