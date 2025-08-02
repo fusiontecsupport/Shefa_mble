@@ -5,6 +5,7 @@ import 'edit.dart';
 import 'view.dart';
 import 'creator_page.dart';
 import 'login_page.dart';
+import 'state.dart' as state_model;
 
 class IndexPage extends StatefulWidget {
   final LoginDetails? loginDetails;
@@ -26,6 +27,12 @@ class _IndexPageState extends State<IndexPage> {
   bool _isLoadingCollectionTargets = false;
   String? _collectionTargetsErrorMessage;
 
+  // Admin state selection
+  List<state_model.State> _allStates = [];
+  state_model.State? _selectedState;
+  bool _isLoadingStates = false;
+  String? _statesErrorMessage;
+
   // Color palette for the app
   final List<Color> _categoryColors = [
     Colors.blue.shade600,
@@ -42,6 +49,11 @@ class _IndexPageState extends State<IndexPage> {
   void initState() {
     super.initState();
     _fetchMonths();
+    
+    // If admin user, fetch all states
+    if (widget.loginDetails?.isAdmin == true) {
+      _fetchAllStates();
+    }
   }
 
   Future<bool> _showExitConfirmation() async {
@@ -100,6 +112,35 @@ class _IndexPageState extends State<IndexPage> {
       setState(() {
         _monthsErrorMessage = 'Failed to load months: $e';
         _isLoadingMonths = false;
+      });
+    }
+  }
+
+  Future<void> _fetchAllStates() async {
+    try {
+      setState(() {
+        _isLoadingStates = true;
+        _statesErrorMessage = null;
+      });
+      final stateList = await _apiService.getAllStatesForAdmin(widget.loginDetails!.userName);
+      setState(() {
+        _allStates = stateList;
+        if (stateList.isNotEmpty) {
+          _selectedState = stateList[0];
+          // Update collection targets for the first state
+          _fetchCollectionTargets(
+            widget.loginDetails!.userName,
+            widget.loginDetails!.brnchId,
+            _selectedMonth?.monthId ?? 1,
+            _selectedState!.id,
+          );
+        }
+        _isLoadingStates = false;
+      });
+    } catch (e) {
+      setState(() {
+        _statesErrorMessage = 'Failed to load states: $e';
+        _isLoadingStates = false;
       });
     }
   }
@@ -172,11 +213,14 @@ class _IndexPageState extends State<IndexPage> {
               tooltip: 'Refresh',
               onPressed: () {
                 if (_selectedMonth != null && widget.loginDetails != null) {
+                  final stateId = widget.loginDetails!.isAdmin 
+                      ? (_selectedState?.id ?? widget.loginDetails!.stateId)
+                      : widget.loginDetails!.stateId;
                   _fetchCollectionTargets(
                     widget.loginDetails!.userName,
                     widget.loginDetails!.brnchId,
                     _selectedMonth!.monthId,
-                    widget.loginDetails!.stateId,
+                    stateId,
                   );
                 }
               },
@@ -247,6 +291,85 @@ class _IndexPageState extends State<IndexPage> {
               ],
             ),
             const SizedBox(height: 12),
+            // State dropdown for admin users
+            if (widget.loginDetails?.isAdmin == true) ...[
+              Row(
+                children: [
+                  Icon(Icons.location_on, color: Colors.deepPurple, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'SELECT STATE',
+                    style: textTheme.labelLarge?.copyWith(
+                      color: Colors.deepPurple,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _isLoadingStates
+                  ? const Center(child: CircularProgressIndicator())
+                  : _statesErrorMessage != null
+                      ? Text(
+                          'Error: $_statesErrorMessage',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: Colors.red,
+                          ),
+                        )
+                      : _allStates.isEmpty
+                          ? Text(
+                              'No states available.',
+                              style: textTheme.bodyMedium,
+                            )
+                          : Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                color: Colors.deepPurple.withOpacity(0.1),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              child: DropdownButton<state_model.State>(
+                                value: _selectedState,
+                                hint: Text('Select State',
+                                    style: textTheme.bodyLarge?.copyWith(
+                                        color: Colors.deepPurple)),
+                                isExpanded: true,
+                                underline: const SizedBox(),
+                                borderRadius: BorderRadius.circular(16),
+                                dropdownColor: Colors.white,
+                                icon: Icon(
+                                  Icons.arrow_drop_down,
+                                  color: Colors.deepPurple,
+                                ),
+                                onChanged: (state_model.State? newValue) {
+                                  setState(() {
+                                    _selectedState = newValue;
+                                    if (newValue != null && _selectedMonth != null && widget.loginDetails != null) {
+                                      _fetchCollectionTargets(
+                                        widget.loginDetails!.userName,
+                                        widget.loginDetails!.brnchId,
+                                        _selectedMonth!.monthId,
+                                        newValue.id,
+                                      );
+                                    }
+                                  });
+                                },
+                                items: _allStates.map<DropdownMenuItem<state_model.State>>(
+                                    (state) {
+                                  return DropdownMenuItem<state_model.State>(
+                                    value: state,
+                                    child: Text(
+                                      state.stateName,
+                                      style: textTheme.bodyLarge?.copyWith(
+                                          color: Colors.deepPurple),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+              const SizedBox(height: 16),
+            ],
+
             _isLoadingMonths
                 ? const Center(child: CircularProgressIndicator())
                 : _monthsErrorMessage != null
@@ -284,11 +407,14 @@ class _IndexPageState extends State<IndexPage> {
                                 setState(() {
                                   _selectedMonth = newValue;
                                   if (newValue != null && widget.loginDetails != null) {
+                                    final stateId = widget.loginDetails!.isAdmin 
+                                        ? (_selectedState?.id ?? widget.loginDetails!.stateId)
+                                        : widget.loginDetails!.stateId;
                                     _fetchCollectionTargets(
                                       widget.loginDetails!.userName,
                                       widget.loginDetails!.brnchId,
                                       newValue.monthId,
-                                      widget.loginDetails!.stateId,
+                                      stateId,
                                     );
                                   }
                                 });

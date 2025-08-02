@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'location.dart';
 import 'dealer.dart';
 import 'month.dart';
+import 'state.dart';
 
 class LoginDetails {
   final String id;
@@ -12,6 +13,7 @@ class LoginDetails {
   final String stateName;
   final int brnchId;
   final int stateId;
+  final bool isAdmin;
 
   LoginDetails({
     required this.id,
@@ -21,17 +23,22 @@ class LoginDetails {
     required this.stateName,
     required this.brnchId,
     required this.stateId,
+    this.isAdmin = false,
   });
 
   factory LoginDetails.fromJson(Map<String, dynamic> json) {
+    final userName = json['UserName'] as String;
+    final isAdmin = userName.toLowerCase() == 'admin';
+    
     return LoginDetails(
       id: json['Id'] as String,
-      userName: json['UserName'] as String,
+      userName: userName,
       brnchName: json['BrnchName'] as String,
       emplName: json['EmplName'] as String,
       stateName: json['StateName'] as String,
       brnchId: json['BrnchId'] as int,
       stateId: json['StateId'] as int,
+      isAdmin: isAdmin,
     );
   }
 }
@@ -105,6 +112,7 @@ Parsed Login Details:
   - Branch: ${loginDetails.brnchName} (ID: ${loginDetails.brnchId})
   - Employee: ${loginDetails.emplName}
   - State: ${loginDetails.stateName} (ID: ${loginDetails.stateId})
+  - Is Admin: ${loginDetails.isAdmin}
 ''');
           return loginDetails;
         }
@@ -139,6 +147,31 @@ Parsed Login Details:
       }
     } catch (e) {
       _log('Month Details Error: $e', isError: true);
+      rethrow;
+    }
+  }
+
+  Future<List<State>> getAllStatesForAdmin(String username) async {
+    final url = '$_baseUrl/loginstateDetails?ids=$username~5';
+    _log('All States for Admin Request: $url');
+
+    try {
+      final response = await http.get(Uri.parse(url));
+      _log('All States for Admin Response (${response.statusCode}): ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['myRoot'] != null && data['myRoot'] is List) {
+          final states = (data['myRoot'] as List).map((state) => State.fromJson(state)).toList();
+          _log('Found ${states.length} states for admin user $username');
+          return states;
+        }
+        return [];
+      } else {
+        throw Exception('Failed to load all states for admin');
+      }
+    } catch (e) {
+      _log('All States for Admin Error: $e', isError: true);
       rethrow;
     }
   }
