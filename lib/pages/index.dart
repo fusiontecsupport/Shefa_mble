@@ -8,6 +8,8 @@ import 'login_page.dart';
 import 'branch_selection_page.dart';
 import 'state.dart' as state_model;
 
+typedef StateModel = state_model.State;
+
 class IndexPage extends StatefulWidget {
   final LoginDetails? loginDetails;
 
@@ -17,7 +19,7 @@ class IndexPage extends StatefulWidget {
   State<IndexPage> createState() => _IndexPageState();
 }
 
-class _IndexPageState extends State<IndexPage> {
+class _IndexPageState extends State<IndexPage> with TickerProviderStateMixin {
   final ApiService _apiService = ApiService();
   List<Month> _months = [];
   Month? _selectedMonth;
@@ -28,53 +30,92 @@ class _IndexPageState extends State<IndexPage> {
   bool _isLoadingCollectionTargets = false;
   String? _collectionTargetsErrorMessage;
 
-  // Admin state selection
-  List<state_model.State> _allStates = [];
-  state_model.State? _selectedState;
-  bool _isLoadingStates = false;
-  String? _statesErrorMessage;
+  // 1. Add variable to store state details
+  List<state_model.State> _stateDetails = [];
 
-  // Color palette for the app
-  final List<Color> _categoryColors = [
-    Colors.blue.shade600,
-    Colors.green.shade600,
-    Colors.orange.shade600,
-    Colors.purple.shade600,
-    Colors.red.shade600,
-    Colors.teal.shade600,
-    Colors.pink.shade600,
-    Colors.indigo.shade600,
+  // Animation controllers
+  late AnimationController _fadeController;
+  late AnimationController _slideController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  // Advanced color palette with gradients
+  final List<LinearGradient> _categoryGradients = [
+    const LinearGradient(colors: [Color(0xFF667eea), Color(0xFF764ba2)]),
+    const LinearGradient(colors: [Color(0xFFf093fb), Color(0xFFf5576c)]),
+    const LinearGradient(colors: [Color(0xFF4facfe), Color(0xFF00f2fe)]),
+    const LinearGradient(colors: [Color(0xFF43e97b), Color(0xFF38f9d7)]),
+    const LinearGradient(colors: [Color(0xFFfa709a), Color(0xFFfee140)]),
+    const LinearGradient(colors: [Color(0xFFa8edea), Color(0xFFfed6e3)]),
+    const LinearGradient(colors: [Color(0xFFff9a9e), Color(0xFFfecfef)]),
+    const LinearGradient(colors: [Color(0xFFffecd2), Color(0xFFfcb69f)]),
   ];
 
   @override
   void initState() {
     super.initState();
-    _fetchMonths();
-    
-    // If admin user, fetch all states
-    if (widget.loginDetails?.isAdmin == true) {
-      _fetchAllStates();
+
+    // Initialize animations
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+    );
+
+    _fadeController.forward();
+    _slideController.forward();
+
+    if (widget.loginDetails?.stateId != null) {
+      _fetchStateDetails(widget.loginDetails!.stateId);
     }
+    _fetchMonths();
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _slideController.dispose();
+    super.dispose();
   }
 
   Future<bool> _showExitConfirmation() async {
     return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Exit'),
-        content: const Text('Are you sure you want to return to login?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Yes'),
-          ),
-        ],
-      ),
-    ) ?? false;
+          context: context,
+          builder:
+              (context) => AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                title: const Text('Confirm Exit'),
+                content: const Text(
+                  'Are you sure you want to return to login?',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text('Yes'),
+                  ),
+                ],
+              ),
+        ) ??
+        false;
   }
 
   Future<void> _handleLogout() async {
@@ -117,37 +158,12 @@ class _IndexPageState extends State<IndexPage> {
     }
   }
 
-  Future<void> _fetchAllStates() async {
-    try {
-      setState(() {
-        _isLoadingStates = true;
-        _statesErrorMessage = null;
-      });
-      final stateList = await _apiService.getAllStatesForAdmin(widget.loginDetails!.userName);
-      setState(() {
-        _allStates = stateList;
-        if (stateList.isNotEmpty) {
-          _selectedState = stateList[0];
-          // Update collection targets for the first state
-          _fetchCollectionTargets(
-            widget.loginDetails!.userName,
-            widget.loginDetails!.brnchId,
-            _selectedMonth?.monthId ?? 1,
-            _selectedState!.id,
-          );
-        }
-        _isLoadingStates = false;
-      });
-    } catch (e) {
-      setState(() {
-        _statesErrorMessage = 'Failed to load states: $e';
-        _isLoadingStates = false;
-      });
-    }
-  }
-
   Future<void> _fetchCollectionTargets(
-      String userName, int branchId, int monthId, int stateId) async {
+    String userName,
+    int branchId,
+    int monthId,
+    int stateId,
+  ) async {
     try {
       setState(() {
         _isLoadingCollectionTargets = true;
@@ -166,15 +182,28 @@ class _IndexPageState extends State<IndexPage> {
       });
     } catch (e) {
       setState(() {
-        _collectionTargetsErrorMessage = 'Failed to load collection targets: $e';
+        _collectionTargetsErrorMessage =
+            'Failed to load collection targets: $e';
         _isLoadingCollectionTargets = false;
       });
     }
   }
 
-  Color _getCategoryColor(String categoryCode) {
+  // 2. Add fetch function for state details
+  Future<void> _fetchStateDetails(int stateId) async {
+    try {
+      final stateDetails = await _apiService.getBranchStateDetails(stateId);
+      setState(() {
+        _stateDetails = stateDetails;
+      });
+    } catch (e) {
+      // Optionally handle error
+    }
+  }
+
+  LinearGradient _getCategoryGradient(String categoryCode) {
     final hash = categoryCode.codeUnits.fold(0, (a, b) => a + b);
-    return _categoryColors[hash % _categoryColors.length];
+    return _categoryGradients[hash % _categoryGradients.length];
   }
 
   @override
@@ -182,6 +211,7 @@ class _IndexPageState extends State<IndexPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
+    final size = MediaQuery.of(context).size;
 
     return PopScope(
       canPop: false,
@@ -196,278 +226,350 @@ class _IndexPageState extends State<IndexPage> {
         }
       },
       child: Scaffold(
-        backgroundColor: Colors.grey[50],
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: _handleLogout,
-          ),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Collection Targets',
-                style: textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              if (widget.loginDetails != null)
-                Text(
-                  widget.loginDetails!.brnchName,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-            ],
-                      ),
-            centerTitle: false,
-          backgroundColor: Colors.deepPurple,
-          elevation: 0,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(
-              bottom: Radius.circular(20),
-            ),
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.business, color: Colors.white),
-              tooltip: 'Switch Branch',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => BranchSelectionPage(loginDetails: widget.loginDetails!),
-                  ),
-                );
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.white),
-              tooltip: 'Refresh',
-              onPressed: () {
-                if (_selectedMonth != null && widget.loginDetails != null) {
-                  final stateId = widget.loginDetails!.isAdmin 
-                      ? (_selectedState?.id ?? widget.loginDetails!.stateId)
-                      : widget.loginDetails!.stateId;
-                  _fetchCollectionTargets(
-                    widget.loginDetails!.userName,
-                    widget.loginDetails!.brnchId,
-                    _selectedMonth!.monthId,
-                    stateId,
-                  );
-                }
-              },
-            ),
-          ],
-        ),
+        backgroundColor: const Color(0xFFf8fafc),
         body: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
+            // Modern App Bar
+            SliverAppBar(
+              expandedHeight: 120,
+              floating: false,
+              pinned: true,
+              elevation: 0,
+              backgroundColor: Colors.transparent,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        const Color(0xFF667eea),
+                        const Color(0xFF764ba2),
+                      ],
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.arrow_back_ios,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                                onPressed: _handleLogout,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Collection Targets',
+                                      style: textTheme.headlineSmall?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    if (widget.loginDetails != null)
+                                      Text(
+                                        widget.loginDetails!.brnchName,
+                                        style: textTheme.bodySmall?.copyWith(
+                                          color: Colors.white70,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.business,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                                tooltip: 'Switch Branch',
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => BranchSelectionPage(
+                                            loginDetails: widget.loginDetails!,
+                                          ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.refresh,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                                tooltip: 'Refresh',
+                                onPressed: () {
+                                  if (_selectedMonth != null &&
+                                      widget.loginDetails != null) {
+                                    final stateId =
+                                        widget.loginDetails!.stateId;
+                                    _fetchCollectionTargets(
+                                      widget.loginDetails!.userName,
+                                      widget.loginDetails!.brnchId,
+                                      _selectedMonth!.monthId,
+                                      stateId,
+                                    );
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // Content
             SliverPadding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(20.0),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-                  _buildMonthSelectorCard(colorScheme, textTheme),
-                  const SizedBox(height: 24),
-                  _buildHeaderStats(colorScheme, textTheme),
-                  const SizedBox(height: 16),
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SlideTransition(
+                      position: _slideAnimation,
+                      child: Column(
+                        children: [
+                          _buildMonthSelectorCard(colorScheme, textTheme),
+                          const SizedBox(height: 24),
+                          _buildHeaderStats(colorScheme, textTheme),
+                          const SizedBox(height: 24),
+                          // State details section
+                          if (_stateDetails.isNotEmpty)
+                            _buildStateDetailsCard(textTheme),
+                        ],
+                      ),
+                    ),
+                  ),
                 ]),
               ),
             ),
             _buildTargetsList(colorScheme, textTheme),
           ],
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CollectionPlanPage(
-                  username: widget.loginDetails?.userName ?? 'admin',
-                  password: 'password',
-                  initialLoginDetails: widget.loginDetails,
-                ),
+        floatingActionButton: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF667eea).withOpacity(0.4),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+                spreadRadius: 0,
               ),
-            );
-          },
-          backgroundColor: Colors.deepPurple,
-          child: const Icon(Icons.add, color: Colors.white),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: FloatingActionButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder:
+                      (context) => CollectionPlanPage(
+                        username: widget.loginDetails?.userName ?? 'admin',
+                        password: 'password',
+                        initialLoginDetails: widget.loginDetails,
+                        stateId: widget.loginDetails?.stateId,
+                      ),
+                ),
+              );
+            },
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child: const Icon(Icons.add, color: Colors.white, size: 28),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildMonthSelectorCard(ColorScheme colorScheme, TextTheme textTheme) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withOpacity(0.9),
+            Colors.white.withOpacity(0.7),
+          ],
+        ),
+        border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF667eea).withOpacity(0.1),
+            blurRadius: 30,
+            offset: const Offset(0, 15),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
-      color: Colors.white,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.calendar_today, color: Colors.deepPurple, size: 20),
-                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF667eea).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.calendar_today,
+                    color: Color(0xFF667eea),
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
                 Text(
                   'SELECT MONTH',
                   style: textTheme.labelLarge?.copyWith(
-                    color: Colors.deepPurple,
+                    color: const Color(0xFF667eea),
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
+                    letterSpacing: 1.0,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            // State dropdown for admin users
-            if (widget.loginDetails?.isAdmin == true) ...[
-              Row(
-                children: [
-                  Icon(Icons.location_on, color: Colors.deepPurple, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    'SELECT STATE',
-                    style: textTheme.labelLarge?.copyWith(
-                      color: Colors.deepPurple,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
+            const SizedBox(height: 20),
+            _isLoadingMonths
+                ? const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFF667eea),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _isLoadingStates
-                  ? const Center(child: CircularProgressIndicator())
-                  : _statesErrorMessage != null
-                      ? Text(
-                          'Error: $_statesErrorMessage',
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: Colors.red,
-                          ),
-                        )
-                      : _allStates.isEmpty
-                          ? Text(
-                              'No states available.',
-                              style: textTheme.bodyMedium,
-                            )
-                          : Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
-                                color: Colors.deepPurple.withOpacity(0.1),
-                              ),
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: DropdownButton<state_model.State>(
-                                value: _selectedState,
-                                hint: Text('Select State',
-                                    style: textTheme.bodyLarge?.copyWith(
-                                        color: Colors.deepPurple)),
-                                isExpanded: true,
-                                underline: const SizedBox(),
-                                borderRadius: BorderRadius.circular(16),
-                                dropdownColor: Colors.white,
-                                icon: Icon(
-                                  Icons.arrow_drop_down,
-                                  color: Colors.deepPurple,
-                                ),
-                                onChanged: (state_model.State? newValue) {
-                                  setState(() {
-                                    _selectedState = newValue;
-                                    if (newValue != null && _selectedMonth != null && widget.loginDetails != null) {
-                                      _fetchCollectionTargets(
-                                        widget.loginDetails!.userName,
-                                        widget.loginDetails!.brnchId,
-                                        _selectedMonth!.monthId,
-                                        newValue.id,
-                                      );
-                                    }
-                                  });
-                                },
-                                items: _allStates.map<DropdownMenuItem<state_model.State>>(
-                                    (state) {
-                                  return DropdownMenuItem<state_model.State>(
-                                    value: state,
-                                    child: Text(
-                                      state.stateName,
-                                      style: textTheme.bodyLarge?.copyWith(
-                                          color: Colors.deepPurple),
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-              const SizedBox(height: 16),
-            ],
-
-            _isLoadingMonths
-                ? const Center(child: CircularProgressIndicator())
+                )
                 : _monthsErrorMessage != null
-                    ? Text(
-                        'Error: $_monthsErrorMessage',
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: Colors.red,
-                        ),
-                      )
-                    : _months.isEmpty
-                        ? Text(
-                            'No months available.',
-                            style: textTheme.bodyMedium,
-                          )
-                        : Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              color: Colors.deepPurple.withOpacity(0.1),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: DropdownButton<Month>(
-                              value: _selectedMonth,
-                              hint: Text('Select Month',
-                                  style: textTheme.bodyLarge?.copyWith(
-                                      color: Colors.deepPurple)),
-                              isExpanded: true,
-                              underline: const SizedBox(),
-                              borderRadius: BorderRadius.circular(16),
-                              dropdownColor: Colors.white,
-                              icon: Icon(
-                                Icons.arrow_drop_down,
-                                color: Colors.deepPurple,
-                              ),
-                              onChanged: (Month? newValue) {
-                                setState(() {
-                                  _selectedMonth = newValue;
-                                  if (newValue != null && widget.loginDetails != null) {
-                                    final stateId = widget.loginDetails!.isAdmin 
-                                        ? (_selectedState?.id ?? widget.loginDetails!.stateId)
-                                        : widget.loginDetails!.stateId;
-                                    _fetchCollectionTargets(
-                                      widget.loginDetails!.userName,
-                                      widget.loginDetails!.brnchId,
-                                      newValue.monthId,
-                                      stateId,
-                                    );
-                                  }
-                                });
-                              },
-                              items: _months.map<DropdownMenuItem<Month>>(
-                                  (month) {
-                                return DropdownMenuItem<Month>(
-                                  value: month,
-                                  child: Text(
-                                    month.monthDesc,
-                                    style: textTheme.bodyLarge?.copyWith(
-                                        color: Colors.deepPurple),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
+                ? Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline, color: Colors.red.shade600),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Error: $_monthsErrorMessage',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: Colors.red.shade600,
                           ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+                : _months.isEmpty
+                ? Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.grey.shade600),
+                      const SizedBox(width: 12),
+                      Text(
+                        'No months available.',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+                : Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    color: Colors.white,
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: DropdownButton<Month>(
+                    value: _selectedMonth,
+                    hint: Text(
+                      'Select Month',
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: const Color(0xFF667eea),
+                      ),
+                    ),
+                    isExpanded: true,
+                    underline: const SizedBox(),
+                    borderRadius: BorderRadius.circular(16),
+                    dropdownColor: Colors.white,
+                    icon: const Icon(
+                      Icons.arrow_drop_down,
+                      color: Color(0xFF667eea),
+                    ),
+                    onChanged: (Month? newValue) {
+                      setState(() {
+                        _selectedMonth = newValue;
+                        if (newValue != null && widget.loginDetails != null) {
+                          final stateId = widget.loginDetails!.stateId;
+                          _fetchCollectionTargets(
+                            widget.loginDetails!.userName,
+                            widget.loginDetails!.brnchId,
+                            newValue.monthId,
+                            stateId,
+                          );
+                        }
+                      });
+                    },
+                    items:
+                        _months.map<DropdownMenuItem<Month>>((month) {
+                          return DropdownMenuItem<Month>(
+                            value: month,
+                            child: Text(
+                              month.monthDesc,
+                              style: textTheme.bodyLarge?.copyWith(
+                                color: const Color(0xFF667eea),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                  ),
+                ),
           ],
         ),
       ),
@@ -476,45 +578,77 @@ class _IndexPageState extends State<IndexPage> {
 
   Widget _buildHeaderStats(ColorScheme colorScheme, TextTheme textTheme) {
     final double totalTarget = _collectionTargets.fold(
-        0.0, (sum, item) => sum + item.hamt1);
+      0.0,
+      (sum, item) => sum + item.hamt1,
+    );
     final double totalCollected = _collectionTargets.fold(
-        0.0, (sum, item) => sum + item.hamt2);
-    final double progress = totalTarget > 0 ? (totalCollected / totalTarget) : 0.0;
+      0.0,
+      (sum, item) => sum + item.hamt2,
+    );
+    final double progress =
+        totalTarget > 0 ? (totalCollected / totalTarget) : 0.0;
 
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white, Colors.grey.shade50],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
-      color: Colors.white,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.assessment, color: Colors.deepPurple, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  'COLLECTION SUMMARY',
-                  style: textTheme.labelLarge?.copyWith(
-                    color: Colors.deepPurple,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF667eea).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.assessment,
+                        color: Color(0xFF667eea),
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        'COLLECTION SUMMARY',
+                        style: textTheme.labelLarge?.copyWith(
+                          color: const Color(0xFF667eea),
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const Spacer(),
-                if (_selectedMonth != null)
+                if (_selectedMonth != null) ...[
+                  const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.deepPurple,
-                          Colors.purpleAccent,
-                        ],
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF667eea), Color(0xFF764ba2)],
                       ),
                       borderRadius: BorderRadius.circular(20),
                     ),
@@ -526,78 +660,279 @@ class _IndexPageState extends State<IndexPage> {
                       ),
                     ),
                   ),
+                ],
               ],
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _StatCard(
-                    title: 'Target',
-                    value: totalTarget,
-                    color: Colors.deepPurple,
-                    icon: Icons.flag_outlined,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _StatCard(
-                    title: 'Collected',
-                    value: totalCollected,
-                    color: progress >= 1 ? Colors.green : Colors.orange,
-                    icon: Icons.attach_money_outlined,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Stack(
-              children: [
-                Container(
-                  height: 12,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(6),
-                    color: Colors.grey[200],
-                  ),
-                ),
-                Container(
-                  height: 12,
-                  width: double.infinity,
-                  child: FractionallySizedBox(
-                    widthFactor: progress,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(6),
-                        gradient: LinearGradient(
-                          colors: progress >= 1
-                              ? [Colors.green, Colors.lightGreenAccent]
-                              : [Colors.deepPurple, Colors.purpleAccent],
+            const SizedBox(height: 24),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isWideScreen = constraints.maxWidth > 400;
+                return isWideScreen
+                    ? Row(
+                      children: [
+                        Expanded(
+                          child: _ModernStatCard(
+                            title: 'First Half',
+                            value: totalTarget,
+                            color: const Color(0xFF667eea),
+                            icon: Icons.flag_outlined,
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _ModernStatCard(
+                            title: 'Second Half',
+                            value: totalCollected,
+                            color:
+                                progress >= 1
+                                    ? const Color(0xFF43e97b)
+                                    : const Color(0xFFf5576c),
+                            icon: Icons.attach_money_outlined,
+                            gradient:
+                                progress >= 1
+                                    ? const LinearGradient(
+                                      colors: [
+                                        Color(0xFF43e97b),
+                                        Color(0xFF38f9d7),
+                                      ],
+                                    )
+                                    : const LinearGradient(
+                                      colors: [
+                                        Color(0xFFf5576c),
+                                        Color(0xFFf093fb),
+                                      ],
+                                    ),
+                          ),
+                        ),
+                      ],
+                    )
+                    : Column(
+                      children: [
+                        _ModernStatCard(
+                          title: 'First Half',
+                          value: totalTarget,
+                          color: const Color(0xFF667eea),
+                          icon: Icons.flag_outlined,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _ModernStatCard(
+                          title: 'Second Half',
+                          value: totalCollected,
+                          color:
+                              progress >= 1
+                                  ? const Color(0xFF43e97b)
+                                  : const Color(0xFFf5576c),
+                          icon: Icons.attach_money_outlined,
+                          gradient:
+                              progress >= 1
+                                  ? const LinearGradient(
+                                    colors: [
+                                      Color(0xFF43e97b),
+                                      Color(0xFF38f9d7),
+                                    ],
+                                  )
+                                  : const LinearGradient(
+                                    colors: [
+                                      Color(0xFFf5576c),
+                                      Color(0xFFf093fb),
+                                    ],
+                                  ),
+                        ),
+                      ],
+                    );
+              },
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Progress',
+                    style: textTheme.labelMedium?.copyWith(
+                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  Stack(
+                    children: [
+                      Container(
+                        height: 8,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(4),
+                          color: Colors.grey.shade200,
+                        ),
+                      ),
+                      Container(
+                        height: 8,
+                        width: double.infinity,
+                        child: FractionallySizedBox(
+                          widthFactor: progress,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(4),
+                              gradient:
+                                  progress >= 1
+                                      ? const LinearGradient(
+                                        colors: [
+                                          Color(0xFF43e97b),
+                                          Color(0xFF38f9d7),
+                                        ],
+                                      )
+                                      : const LinearGradient(
+                                        colors: [
+                                          Color(0xFF667eea),
+                                          Color(0xFF764ba2),
+                                        ],
+                                      ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '₹${totalCollected.toStringAsFixed(2)} of ₹${totalTarget.toStringAsFixed(2)}',
+                        style: textTheme.labelSmall?.copyWith(
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Progress: ${(progress * 100).toStringAsFixed(1)}%',
+                            style: textTheme.labelSmall?.copyWith(
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  progress >= 1
+                                      ? Colors.green.shade50
+                                      : Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              progress >= 1 ? 'Completed' : 'In Progress',
+                              style: textTheme.labelSmall?.copyWith(
+                                color:
+                                    progress >= 1
+                                        ? Colors.green.shade700
+                                        : Colors.orange.shade700,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStateDetailsCard(TextTheme textTheme) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white, Colors.grey.shade50],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF667eea).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.location_on,
+                    color: Color(0xFF667eea),
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  'STATE DETAILS',
+                  style: textTheme.labelLarge?.copyWith(
+                    color: const Color(0xFF667eea),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.0,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '${(progress * 100).toStringAsFixed(1)}% Completed',
-                  style: textTheme.labelSmall?.copyWith(
-                    color: Colors.deepPurple,
-                    fontWeight: FontWeight.w600,
-                  ),
+            const SizedBox(height: 16),
+            ..._stateDetails.map(
+              (state) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
                 ),
-                Text(
-                  '₹${totalCollected.toStringAsFixed(2)} of ₹${totalTarget.toStringAsFixed(2)}',
-                  style: textTheme.labelSmall?.copyWith(
-                    color: Colors.deepPurple,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Row(
+                  children: [
+                    Icon(Icons.place, color: const Color(0xFF667eea), size: 20),
+                    const SizedBox(width: 12),
+                    Text(
+                      state.stateName,
+                      style: textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ],
         ),
@@ -610,7 +945,7 @@ class _IndexPageState extends State<IndexPage> {
       return const SliverFillRemaining(
         child: Center(
           child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.deepPurple),
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667eea)),
           ),
         ),
       );
@@ -622,39 +957,59 @@ class _IndexPageState extends State<IndexPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline, color: Colors.red, size: 48),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.error_outline,
+                  color: Colors.red.shade600,
+                  size: 48,
+                ),
+              ),
               const SizedBox(height: 16),
               Text(
                 'Error loading data',
                 style: textTheme.titleMedium?.copyWith(
-                  color: Colors.red,
+                  color: Colors.red.shade600,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 _collectionTargetsErrorMessage!,
                 textAlign: TextAlign.center,
-                style: textTheme.bodyMedium,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: Colors.grey.shade600,
+                ),
               ),
-              const SizedBox(height: 16),
-              ElevatedButton(
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
                 onPressed: () {
                   if (_selectedMonth != null && widget.loginDetails != null) {
+                    final stateId = widget.loginDetails!.stateId;
                     _fetchCollectionTargets(
                       widget.loginDetails!.userName,
                       widget.loginDetails!.brnchId,
                       _selectedMonth!.monthId,
-                      widget.loginDetails!.stateId,
+                      stateId,
                     );
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
+                  backgroundColor: const Color(0xFF667eea),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text('Retry', style: TextStyle(color: Colors.white)),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
               ),
             ],
           ),
@@ -668,44 +1023,58 @@ class _IndexPageState extends State<IndexPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.inbox_outlined,
-                size: 64,
-                color: Colors.deepPurple.withOpacity(0.5),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF667eea).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.inbox_outlined,
+                  size: 48,
+                  color: const Color(0xFF667eea),
+                ),
               ),
               const SizedBox(height: 16),
               Text(
                 'No targets found',
                 style: textTheme.titleMedium?.copyWith(
-                  color: Colors.deepPurple,
+                  color: const Color(0xFF667eea),
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'for selected month',
                 style: textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey,
+                  color: Colors.grey.shade600,
                 ),
               ),
-              const SizedBox(height: 16),
-              ElevatedButton(
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
                 onPressed: () {
                   if (_selectedMonth != null && widget.loginDetails != null) {
+                    final stateId = widget.loginDetails!.stateId;
                     _fetchCollectionTargets(
                       widget.loginDetails!.userName,
                       widget.loginDetails!.brnchId,
                       _selectedMonth!.monthId,
-                      widget.loginDetails!.stateId,
+                      stateId,
                     );
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
+                  backgroundColor: const Color(0xFF667eea),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text('Refresh', style: TextStyle(color: Colors.white)),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Refresh'),
               ),
             ],
           ),
@@ -714,114 +1083,134 @@ class _IndexPageState extends State<IndexPage> {
     }
 
     return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       sliver: SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final target = _collectionTargets[index];
-            final categoryColor = _getCategoryColor(target.cateCode);
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: _TargetCard(
-                target: target,
-                categoryColor: categoryColor,
-                onEdit: () async {
-                  final bool? result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          EditClientScreen(tgtplnMid: target.tgtPlnMId),
-                    ),
-                  );
-                  if (result == true) {
-                    if (_selectedMonth != null && widget.loginDetails != null) {
-                      _fetchCollectionTargets(
-                        widget.loginDetails!.userName,
-                        widget.loginDetails!.brnchId,
-                        _selectedMonth!.monthId,
-                        widget.loginDetails!.stateId,
-                      );
-                    }
+        delegate: SliverChildBuilderDelegate((context, index) {
+          final target = _collectionTargets[index];
+          final categoryGradient = _getCategoryGradient(target.cateCode);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: _ModernTargetCard(
+              target: target,
+              categoryGradient: categoryGradient,
+              onEdit: () async {
+                final bool? result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) =>
+                            EditClientScreen(tgtplnMid: target.tgtPlnMId),
+                  ),
+                );
+                if (result == true) {
+                  if (_selectedMonth != null && widget.loginDetails != null) {
+                    final stateId = widget.loginDetails!.stateId;
+                    _fetchCollectionTargets(
+                      widget.loginDetails!.userName,
+                      widget.loginDetails!.brnchId,
+                      _selectedMonth!.monthId,
+                      stateId,
+                    );
                   }
-                },
-                onView: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          ViewTargetActualScreen(tgtplnMid: target.tgtPlnMId),
-                    ),
-                  );
-                },
-              ),
-            );
-          },
-          childCount: _collectionTargets.length,
-        ),
+                }
+              },
+              onView: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) =>
+                            ViewTargetActualScreen(tgtplnMid: target.tgtPlnMId),
+                  ),
+                );
+              },
+            ),
+          );
+        }, childCount: _collectionTargets.length),
       ),
     );
   }
 }
 
-class _StatCard extends StatelessWidget {
+class _ModernStatCard extends StatelessWidget {
   final String title;
   final double value;
   final Color color;
   final IconData icon;
+  final LinearGradient gradient;
 
-  const _StatCard({
+  const _ModernStatCard({
     required this.title,
     required this.value,
     required this.color,
     required this.icon,
+    required this.gradient,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+            color: color.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 24, color: color),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w600,
-                    ),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 20, color: Colors.white),
               ),
-              const SizedBox(height: 4),
-              Text(
-                '₹${value.toStringAsFixed(2)}',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: color,
-                    ),
+              const Spacer(),
+              Icon(
+                Icons.trending_up,
+                color: Colors.white.withOpacity(0.7),
+                size: 16,
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Colors.white.withOpacity(0.8),
+              fontWeight: FontWeight.w600,
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
+          const SizedBox(height: 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '₹${value.toStringAsFixed(2)}',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
           ),
         ],
       ),
@@ -829,15 +1218,15 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _TargetCard extends StatelessWidget {
+class _ModernTargetCard extends StatelessWidget {
   final CollectionTarget target;
-  final Color categoryColor;
+  final LinearGradient categoryGradient;
   final VoidCallback onEdit;
   final VoidCallback onView;
 
-  const _TargetCard({
+  const _ModernTargetCard({
     required this.target,
-    required this.categoryColor,
+    required this.categoryGradient,
     required this.onEdit,
     required this.onView,
   });
@@ -845,65 +1234,122 @@ class _TargetCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final double progress = target.hamt1 > 0 ? (target.hamt2 / target.hamt1) : 0.0;
+    final double progress =
+        target.hamt1 > 0 ? (target.hamt2 / target.hamt1) : 0.0;
     final isWideScreen = MediaQuery.of(context).size.width > 400;
 
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withOpacity(0.95),
+            Colors.white.withOpacity(0.8),
+          ],
+        ),
+        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: categoryGradient.colors.first.withOpacity(0.1),
+            blurRadius: 30,
+            offset: const Offset(0, 15),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {},
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    target.cateCode,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: categoryColor,
-                    ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: categoryGradient,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          target.cateName,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black87,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                  child: const Icon(
+                    Icons.category,
+                    size: 24,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        target.cateCode,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: categoryGradient.colors.first,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
                         ),
-                        if (target.catePName.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              target.catePName,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.grey[600],
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        target.cateName,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (target.catePName.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            target.catePName,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.grey.shade600,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                      ],
-                    ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withOpacity(0.9),
+                    Colors.white.withOpacity(0.7),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.3),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Column(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
@@ -912,71 +1358,128 @@ class _TargetCard extends StatelessWidget {
                       Text(
                         'Progress',
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: Colors.grey[600],
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      Text(
-                        '${(progress * 100).toStringAsFixed(1)}%',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: Colors.grey[600],
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              progress >= 1
+                                  ? Colors.green.shade50
+                                  : Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${(progress * 100).toStringAsFixed(1)}%',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color:
+                                progress >= 1
+                                    ? Colors.green.shade700
+                                    : Colors.orange.shade700,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   LinearProgressIndicator(
                     value: progress,
-                    backgroundColor: Colors.grey[200],
-                    color: progress >= 1 ? Colors.green : categoryColor,
+                    backgroundColor: Colors.grey.shade200,
+                    color:
+                        progress >= 1
+                            ? Colors.green
+                            : categoryGradient.colors.first,
                     minHeight: 8,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              isWideScreen
-                  ? Row(
-                      children: [
-                        Expanded(
-                          child: _AmountIndicator(
-                            title: 'Target',
-                            amount: target.hamt1,
-                            color: Colors.deepPurple,
-                          ),
+            ),
+            const SizedBox(height: 20),
+            isWideScreen
+                ? Row(
+                  children: [
+                    Expanded(
+                      child: _ModernAmountIndicator(
+                        title: 'First Half',
+                        amount: target.hamt1,
+                        color: const Color(0xFF667eea),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF667eea), Color(0xFF764ba2)],
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _AmountIndicator(
-                            title: 'Collected',
-                            amount: target.hamt2,
-                            color: progress >= 1 ? Colors.green : Colors.orange,
-                          ),
-                        ),
-                      ],
-                    )
-                  : Column(
-                      children: [
-                        _AmountIndicator(
-                          title: 'Target',
-                          amount: target.hamt1,
-                          color: Colors.deepPurple,
-                        ),
-                        const SizedBox(height: 8),
-                        _AmountIndicator(
-                          title: 'Collected',
-                          amount: target.hamt2,
-                          color: progress >= 1 ? Colors.green : Colors.orange,
-                        ),
-                      ],
+                      ),
                     ),
-              if (target.catePHN3.isNotEmpty || target.cateEmail.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Divider(
-                  height: 1,
-                  color: Colors.grey[300],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _ModernAmountIndicator(
+                        title: 'Second Half',
+                        amount: target.hamt2,
+                        color:
+                            progress >= 1
+                                ? const Color(0xFF43e97b)
+                                : const Color(0xFFf5576c),
+                        gradient:
+                            progress >= 1
+                                ? const LinearGradient(
+                                  colors: [
+                                    Color(0xFF43e97b),
+                                    Color(0xFF38f9d7),
+                                  ],
+                                )
+                                : const LinearGradient(
+                                  colors: [
+                                    Color(0xFFf5576c),
+                                    Color(0xFFf093fb),
+                                  ],
+                                ),
+                      ),
+                    ),
+                  ],
+                )
+                : Column(
+                  children: [
+                    _ModernAmountIndicator(
+                      title: 'First Half',
+                      amount: target.hamt1,
+                      color: const Color(0xFF667eea),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _ModernAmountIndicator(
+                      title: 'Second Half',
+                      amount: target.hamt2,
+                      color:
+                          progress >= 1
+                              ? const Color(0xFF43e97b)
+                              : const Color(0xFFf5576c),
+                      gradient:
+                          progress >= 1
+                              ? const LinearGradient(
+                                colors: [Color(0xFF43e97b), Color(0xFF38f9d7)],
+                              )
+                              : const LinearGradient(
+                                colors: [Color(0xFFf5576c), Color(0xFFf093fb)],
+                              ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                Row(
+            if (target.catePHN3.isNotEmpty || target.cateEmail.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
                   children: [
                     if (target.catePHN3.isNotEmpty)
                       Expanded(
@@ -985,14 +1488,14 @@ class _TargetCard extends StatelessWidget {
                             Icon(
                               Icons.phone_outlined,
                               size: 18,
-                              color: categoryColor,
+                              color: categoryGradient.colors.first,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 target.catePHN3,
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: Colors.grey[700],
+                                  color: Colors.grey.shade700,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -1007,14 +1510,14 @@ class _TargetCard extends StatelessWidget {
                             Icon(
                               Icons.email_outlined,
                               size: 18,
-                              color: categoryColor,
+                              color: categoryGradient.colors.first,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 target.cateEmail,
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: Colors.grey[700],
+                                  color: Colors.grey.shade700,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -1024,89 +1527,103 @@ class _TargetCard extends StatelessWidget {
                       ),
                   ],
                 ),
-              ],
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: onEdit,
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        side: BorderSide(
-                          color: categoryColor,
-                        ),
-                      ),
-                      icon: Icon(
-                        Icons.edit_outlined,
-                        size: 18,
-                        color: categoryColor,
-                      ),
-                      label: Text(
-                        'Edit',
-                        style: TextStyle(
-                          color: categoryColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: onView,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        backgroundColor: categoryColor,
-                      ),
-                      icon: const Icon(
-                        Icons.visibility_outlined,
-                        size: 18,
-                        color: Colors.white,
-                      ),
-                      label: const Text(
-                        'View',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ],
-          ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onEdit,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      side: BorderSide(color: categoryGradient.colors.first),
+                    ),
+                    icon: Icon(
+                      Icons.edit_outlined,
+                      size: 18,
+                      color: categoryGradient.colors.first,
+                    ),
+                    label: Text(
+                      'Edit',
+                      style: TextStyle(
+                        color: categoryGradient.colors.first,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: onView,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      backgroundColor: categoryGradient.colors.first,
+                    ),
+                    icon: const Icon(
+                      Icons.visibility_outlined,
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                    label: const Text(
+                      'View',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _AmountIndicator extends StatelessWidget {
+class _ModernAmountIndicator extends StatelessWidget {
   final String title;
   final double amount;
   final Color color;
+  final LinearGradient gradient;
 
-  const _AmountIndicator({
+  const _ModernAmountIndicator({
     required this.title,
     required this.amount,
     required this.color,
+    required this.gradient,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1114,16 +1631,23 @@ class _AmountIndicator extends StatelessWidget {
           Text(
             title,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Colors.grey[600],
-                ),
+              color: Colors.white.withOpacity(0.8),
+              fontWeight: FontWeight.w600,
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
-          const SizedBox(height: 4),
-          Text(
-            '₹${amount.toStringAsFixed(2)}',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                ),
+          const SizedBox(height: 8),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '₹${amount.toStringAsFixed(2)}',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
           ),
         ],
       ),

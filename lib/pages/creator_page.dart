@@ -48,7 +48,6 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
   List<Location> locations = [];
   List<Dealer> dealers = [];
   List<Month> months = [];
-  List<state_model.State> allStates = [];
   List<Map<String, dynamic>> dealerOutstandingList = [];
   List<TextEditingController> firstHalfControllers = [];
   List<TextEditingController> secondHalfControllers = [];
@@ -62,6 +61,7 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
   void _initializeData() {
     if (widget.stateId != null) {
       stateId = widget.stateId;
+      fetchStateDetails(widget.stateId!);
       fetchLocations(widget.stateId!);
     }
 
@@ -96,8 +96,14 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
       isLoading = false;
     });
 
+    // Fetch state details to get the description
+    fetchStateDetails(loginData.stateId);
+
     if (isAdmin) {
-      fetchAllStates();
+      // Only fetch locations if not an admin, as admin fetches all states
+      if (!isAdmin) {
+        fetchLocations(loginData.stateId);
+      }
     } else {
       fetchLocations(loginData.stateId);
     }
@@ -114,30 +120,6 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
     }
   }
 
-  Future<void> fetchAllStates() async {
-    try {
-      final stateList = await _apiService.getAllStatesForAdmin(
-        usernameFromLogin!,
-      );
-      if (mounted) {
-        setState(() {
-          allStates = stateList;
-          if (stateList.isNotEmpty) {
-            selectedState = stateList[0];
-            stateId = selectedState!.id;
-            stateName = selectedState!.stateName;
-          }
-        });
-        // Fetch locations for the first state
-        if (stateList.isNotEmpty) {
-          fetchLocations(stateList[0].id);
-        }
-      }
-    } catch (e) {
-      _showError('Error fetching all states: ${e.toString()}');
-    }
-  }
-
   Future<void> fetchLoginAndState() async {
     try {
       final LoginDetails? loginData = await _apiService
@@ -151,6 +133,23 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
       }
     } catch (e) {
       _showError('Error fetching login data: ${e.toString()}');
+    }
+  }
+
+  Future<void> fetchStateDetails(int stateId) async {
+    try {
+      final stateList = await _apiService
+          .getBranchStateDetails(stateId)
+          .timeout(const Duration(seconds: 30));
+
+      if (mounted && stateList.isNotEmpty) {
+        setState(() {
+          selectedState = stateList.first;
+          stateName = stateList.first.stateName;
+        });
+      }
+    } catch (e) {
+      _showError('Error fetching state details: ${e.toString()}');
     }
   }
 
@@ -521,7 +520,7 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
           _buildStateDropdown(),
           const SizedBox(height: 16),
         ] else ...[
-          _buildInfoCard('State', stateName ?? 'Loading...', Icons.location_on),
+          _buildInfoCard('', stateName ?? 'Loading...', Icons.location_on),
           const SizedBox(height: 16),
         ],
         _buildInfoCard(
@@ -589,13 +588,22 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
               ],
             ),
             const SizedBox(height: 8),
-            _buildDropdown<state_model.State>(
-              label: '',
-              value: selectedState,
-              items: allStates,
-              displayText: (state) => state?.stateName ?? 'Select State',
-              onChanged: _onStateChanged,
+            // Replace the dropdown with a read-only display of the state name
+            Row(
+              children: [
+                const Icon(Icons.location_on, color: Colors.deepPurple),
+                const SizedBox(width: 8),
+                Text(
+                  stateName ?? 'State',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.deepPurple,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
             ),
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -1338,6 +1346,32 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // --- Show selected state description only ---
+                      if (selectedState?.stateDesc != null) ...[
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.description,
+                              color: Colors.blue,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                selectedState!.stateDesc!,
+                                style: const TextStyle(
+                                  color: Colors.blue,
+                                  fontSize: 14,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      const SizedBox(height: 16),
+                      // --- End state id display ---
                       _buildHeader(),
                       const SizedBox(height: 24),
                       _buildSelectionSection(),

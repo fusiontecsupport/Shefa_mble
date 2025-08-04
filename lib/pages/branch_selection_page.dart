@@ -115,333 +115,478 @@ class _BranchSelectionPageState extends State<BranchSelectionPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset('assets/bg.jpg', fit: BoxFit.cover),
-          Container(color: Colors.black.withOpacity(0.3)),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    // Header
-                    Row(
+      backgroundColor: const Color(0xFFF8F9FA),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            children: [
+              // Compact Header
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new,
+                      color: Color(0xFF2C3E50),
+                      size: 18,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.arrow_back,
-                            color: Colors.white,
+                        Text(
+                          'Branch Selection',
+                          style: TextStyle(
+                            color: const Color(0xFF2C3E50),
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
                           ),
-                          onPressed: () => Navigator.pop(context),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Text(
-                            'Select Branch',
-                            style: Theme.of(
-                              context,
-                            ).textTheme.headlineSmall?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        Text(
+                          'Choose your workspace',
+                          style: TextStyle(
+                            color: const Color(0xFF7F8C8D),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 32),
-                    // Welcome message
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
+              // Compact Welcome Section
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [const Color(0xFF3498DB), const Color(0xFF2980B9)],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF3498DB).withOpacity(0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
                     Container(
-                      padding: const EdgeInsets.all(24),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.25),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.2),
-                        ),
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
                       ),
+                      child: const Icon(
+                        Icons.person,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          CircleAvatar(
-                            radius: 40,
-                            backgroundColor: Colors.white.withOpacity(0.2),
-                            child: Icon(
-                              Icons.person,
-                              size: 40,
+                          Text(
+                            'Welcome back!',
+                            style: const TextStyle(
                               color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 2),
                           Text(
-                            'Welcome,  {widget.loginDetails.emplName}!',
-                            style: Theme.of(
-                              context,
-                            ).textTheme.headlineSmall?.copyWith(
+                            widget.loginDetails.emplName,
+                            style: const TextStyle(
                               color: Colors.white,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
                             ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Please select your branch to continue',
-                            style: Theme.of(context).textTheme.bodyLarge
-                                ?.copyWith(color: Colors.white70),
-                            textAlign: TextAlign.center,
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 32),
-                    // Branch selection
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.25),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.2),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.business,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Available Branches',
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.titleLarge?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Compact Branch Selection
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3498DB).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          const SizedBox(height: 24),
-                          if (_isLoading)
-                            const Center(
+                          child: const Icon(
+                            Icons.business,
+                            color: Color(0xFF3498DB),
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Available Branches',
+                          style: TextStyle(
+                            color: const Color(0xFF2C3E50),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    if (_isLoading)
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 20,
+                              height: 20,
                               child: CircularProgressIndicator(
                                 valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
+                                  const Color(0xFF3498DB),
                                 ),
+                                strokeWidth: 2,
                               ),
-                            )
-                          else if (_errorMessage != null)
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Loading branches...',
+                              style: TextStyle(
+                                color: const Color(0xFF7F8C8D),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else if (_errorMessage != null)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE74C3C).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFE74C3C).withOpacity(0.2),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
                               children: [
                                 Icon(
                                   Icons.error_outline,
-                                  color: Colors.red,
-                                  size: 48,
+                                  color: const Color(0xFFE74C3C),
+                                  size: 20,
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(width: 8),
                                 Text(
-                                  'Error',
-                                  style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(color: Colors.red),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  _errorMessage!,
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(color: Colors.white70),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  onPressed: _fetchBranches,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: Colors.deepPurple,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: const Text('Retry'),
-                                ),
-                              ],
-                            )
-                          else if (_branches.isEmpty)
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.business_outlined,
-                                  color: Colors.white70,
-                                  size: 48,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'No branches available',
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.titleMedium?.copyWith(
-                                    color: Colors.white,
+                                  'Connection Error',
+                                  style: TextStyle(
+                                    color: const Color(0xFFE74C3C),
+                                    fontSize: 14,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Please contact your administrator',
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(color: Colors.white70),
-                                ),
                               ],
-                            )
-                          else
-                            Column(
-                              children: [
-                                // Debug info
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  margin: const EdgeInsets.only(bottom: 16),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: Colors.blue.withOpacity(0.5),
-                                    ),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Debug Info:',
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.labelSmall?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      Text(
-                                        'Found ${_branches.length} branches',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(color: Colors.white70),
-                                      ),
-                                      if (_selectedBranch != null)
-                                        Text(
-                                          'Selected: ${_selectedBranch!.branchName}',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodySmall
-                                              ?.copyWith(color: Colors.white70),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                // Branch dropdown
-                                Container(
-                                  width: double.infinity,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _errorMessage!,
+                              style: TextStyle(
+                                color: const Color(0xFF7F8C8D),
+                                fontSize: 12,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: _fetchBranches,
+                                icon: const Icon(Icons.refresh, size: 16),
+                                label: const Text('Try Again'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF3498DB),
+                                  foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 16,
                                     vertical: 8,
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: Colors.white.withOpacity(0.3),
-                                    ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: DropdownButton<Branch>(
-                                    value: _selectedBranch,
-                                    isExpanded: true,
-                                    underline: const SizedBox(),
-                                    dropdownColor: Colors.deepPurple,
-                                    icon: const Icon(
-                                      Icons.arrow_drop_down,
-                                      color: Colors.white,
-                                      size: 28,
-                                    ),
-                                    hint: Text(
-                                      'Select a branch',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.titleMedium?.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleMedium?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    onChanged: (Branch? newValue) {
-                                      setState(() {
-                                        _selectedBranch = newValue;
-                                      });
-                                    },
-                                    items:
-                                        _branches.map<DropdownMenuItem<Branch>>(
-                                          (Branch branch) {
-                                            return DropdownMenuItem<Branch>(
-                                              value: branch,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else if (_branches.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.business_outlined,
+                              color: const Color(0xFFBDC3C7),
+                              size: 40,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'No Branches Available',
+                              style: TextStyle(
+                                color: const Color(0xFF7F8C8D),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Contact your administrator',
+                              style: TextStyle(
+                                color: const Color(0xFFBDC3C7),
+                                fontSize: 12,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Column(
+                        children: [
+                          // Compact Dropdown
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8F9FA),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color:
+                                    _selectedBranch != null
+                                        ? const Color(0xFF3498DB)
+                                        : const Color(0xFFE5E7EB),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: DropdownButton<Branch>(
+                              value: _selectedBranch,
+                              isExpanded: true,
+                              underline: const SizedBox(),
+                              dropdownColor: Colors.white,
+                              icon: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF3498DB,
+                                  ).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Icon(
+                                  Icons.keyboard_arrow_down,
+                                  color: Color(0xFF3498DB),
+                                  size: 18,
+                                ),
+                              ),
+                              hint: Text(
+                                'Select your branch',
+                                style: TextStyle(
+                                  color: const Color(0xFF9CA3AF),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              style: const TextStyle(
+                                color: Color(0xFF2C3E50),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                              onChanged: (Branch? newValue) {
+                                setState(() {
+                                  _selectedBranch = newValue;
+                                });
+                              },
+                              items:
+                                  _branches.map<DropdownMenuItem<Branch>>((
+                                    Branch branch,
+                                  ) {
+                                    return DropdownMenuItem<Branch>(
+                                      value: branch,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 8,
+                                          horizontal: 4,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.business,
+                                              color: const Color(0xFF3498DB),
+                                              size: 16,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
                                               child: Text(
                                                 branch.branchName,
                                                 style: const TextStyle(
-                                                  color: Colors.white,
+                                                  color: Color(0xFF2C3E50),
                                                   fontWeight: FontWeight.w600,
-                                                  fontSize: 16,
+                                                  fontSize: 14,
                                                 ),
+                                                overflow: TextOverflow.visible,
+                                                maxLines: null,
                                               ),
-                                            );
-                                          },
-                                        ).toList(),
-                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                            ),
+                          ),
+
+                          // Compact Branch Counter
+                          if (_branches.isNotEmpty)
+                            Container(
+                              margin: const EdgeInsets.only(top: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF3498DB).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${_branches.length} branch${_branches.length > 1 ? 'es' : ''} available',
+                                style: TextStyle(
+                                  color: const Color(0xFF3498DB),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
                                 ),
-                              ],
+                              ),
                             ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    // Continue button
-                    if (!_isLoading && _branches.isNotEmpty)
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed:
-                              _selectedBranch != null
-                                  ? _onContinuePressed
-                                  : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.deepPurple,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: Text(
-                            'Continue',
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 24),
                   ],
                 ),
               ),
-            ),
+
+              const Spacer(),
+
+              // Compact Continue Button
+              if (!_isLoading && _branches.isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors:
+                          _selectedBranch != null
+                              ? [
+                                const Color(0xFF3498DB),
+                                const Color(0xFF2980B9),
+                              ]
+                              : [
+                                const Color(0xFFBDC3C7),
+                                const Color(0xFF95A5A6),
+                              ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow:
+                        _selectedBranch != null
+                            ? [
+                              BoxShadow(
+                                color: const Color(0xFF3498DB).withOpacity(0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ]
+                            : null,
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap:
+                          _selectedBranch != null ? _onContinuePressed : null,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (_selectedBranch != null) ...[
+                              const Icon(
+                                Icons.arrow_forward,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            Text(
+                              _selectedBranch != null
+                                  ? 'Continue to App'
+                                  : 'Select Branch',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              const SizedBox(height: 20),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
