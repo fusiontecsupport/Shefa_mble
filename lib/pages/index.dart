@@ -5,12 +5,13 @@ import 'edit.dart';
 import 'view.dart';
 import 'creator_page.dart';
 import 'login_page.dart';
+import 'branch_selection_page.dart';
 import 'state.dart' as state_model;
 
 class IndexPage extends StatefulWidget {
   final LoginDetails? loginDetails;
 
-  const IndexPage({Key? key, this.loginDetails}) : super(key: key);
+  const IndexPage({super.key, this.loginDetails});
 
   @override
   State<IndexPage> createState() => _IndexPageState();
@@ -182,8 +183,18 @@ class _IndexPageState extends State<IndexPage> {
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
 
-    return WillPopScope(
-      onWillPop: _showExitConfirmation,
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        final shouldLogout = await _showExitConfirmation();
+        if (shouldLogout && mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginPage()),
+          );
+        }
+      },
       child: Scaffold(
         backgroundColor: Colors.grey[50],
         appBar: AppBar(
@@ -191,15 +202,28 @@ class _IndexPageState extends State<IndexPage> {
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: _handleLogout,
           ),
-          title: Text(
-            'Collection Targets',
-            style: textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              letterSpacing: 0.5,
-            ),
-          ),
-          centerTitle: true,
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Collection Targets',
+                style: textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              if (widget.loginDetails != null)
+                Text(
+                  widget.loginDetails!.brnchName,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+            ],
+                      ),
+            centerTitle: false,
           backgroundColor: Colors.deepPurple,
           elevation: 0,
           shape: const RoundedRectangleBorder(
@@ -208,6 +232,18 @@ class _IndexPageState extends State<IndexPage> {
             ),
           ),
           actions: [
+            IconButton(
+              icon: const Icon(Icons.business, color: Colors.white),
+              tooltip: 'Switch Branch',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => BranchSelectionPage(loginDetails: widget.loginDetails!),
+                  ),
+                );
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.refresh, color: Colors.white),
               tooltip: 'Refresh',

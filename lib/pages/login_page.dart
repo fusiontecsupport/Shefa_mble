@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'index.dart';
+import 'branch_selection_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -38,15 +39,47 @@ class _LoginPageState extends State<LoginPage> {
 
         if (result != null) {
           setState(() => _errorMessage = null);
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => IndexPage(loginDetails: result),
-            ),
-          );
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Login Successful')),
-          );
+          
+          // Check if user has multiple branches
+          try {
+            final branches = await _apiService.getBranchList(
+              result.userName,
+              result.brnchId,
+            );
+            
+            if (branches.length > 1) {
+              // User has multiple branches, show branch selection
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => BranchSelectionPage(loginDetails: result),
+                ),
+              );
+            } else {
+              // User has only one branch, proceed directly to main app
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => IndexPage(loginDetails: result),
+                ),
+              );
+            }
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Login Successful')),
+            );
+          } catch (branchError) {
+            // If branch check fails, proceed with original login details
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => IndexPage(loginDetails: result),
+              ),
+            );
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Login Successful')),
+            );
+          }
         } else {
           throw Exception('Invalid username or password.');
         }

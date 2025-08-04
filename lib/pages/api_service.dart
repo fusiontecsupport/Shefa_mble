@@ -4,6 +4,7 @@ import 'location.dart';
 import 'dealer.dart';
 import 'month.dart';
 import 'state.dart';
+import 'branch.dart';
 
 class LoginDetails {
   final String id;
@@ -29,7 +30,7 @@ class LoginDetails {
   factory LoginDetails.fromJson(Map<String, dynamic> json) {
     final userName = json['UserName'] as String;
     final isAdmin = userName.toLowerCase() == 'admin';
-    
+
     return LoginDetails(
       id: json['Id'] as String,
       userName: userName,
@@ -83,7 +84,8 @@ class CollectionTarget {
 
 class ApiService {
   final String _baseUrl = 'http://fusiontecsoftware.com/shefawebapi/shefaapi';
-  final String _saveCollectionUrl = 'https://fusiontecsoftware.com/shefawebapi/api/dealeroutstanding/save';
+  final String _saveCollectionUrl =
+      'https://fusiontecsoftware.com/shefawebapi/api/dealeroutstanding/save';
   final bool _debugMode = true;
 
   void _log(String message, {bool isError = false}) {
@@ -103,7 +105,9 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['myRoot'] != null && data['myRoot'] is List && data['myRoot'].isNotEmpty) {
+        if (data['myRoot'] != null &&
+            data['myRoot'] is List &&
+            data['myRoot'].isNotEmpty) {
           final loginDetails = LoginDetails.fromJson(data['myRoot'][0]);
           _log('''
 Parsed Login Details:
@@ -137,7 +141,10 @@ Parsed Login Details:
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['myRoot'] != null && data['myRoot'] is List) {
-          final months = (data['myRoot'] as List).map((month) => Month.fromJson(month)).toList();
+          final months =
+              (data['myRoot'] as List)
+                  .map((month) => Month.fromJson(month))
+                  .toList();
           _log('Found ${months.length} months');
           return months;
         }
@@ -157,12 +164,17 @@ Parsed Login Details:
 
     try {
       final response = await http.get(Uri.parse(url));
-      _log('All States for Admin Response (${response.statusCode}): ${response.body}');
+      _log(
+        'All States for Admin Response (${response.statusCode}): ${response.body}',
+      );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['myRoot'] != null && data['myRoot'] is List) {
-          final states = (data['myRoot'] as List).map((state) => State.fromJson(state)).toList();
+          final states =
+              (data['myRoot'] as List)
+                  .map((state) => State.fromJson(state))
+                  .toList();
           _log('Found ${states.length} states for admin user $username');
           return states;
         }
@@ -182,12 +194,17 @@ Parsed Login Details:
 
     try {
       final response = await http.get(Uri.parse(url));
-      _log('Location Details Response (${response.statusCode}): ${response.body}');
+      _log(
+        'Location Details Response (${response.statusCode}): ${response.body}',
+      );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['myRoot'] != null && data['myRoot'] is List) {
-          final locations = (data['myRoot'] as List).map((loc) => Location.fromJson(loc)).toList();
+          final locations =
+              (data['myRoot'] as List)
+                  .map((loc) => Location.fromJson(loc))
+                  .toList();
           _log('Found ${locations.length} locations for state $stateId');
           return locations;
         }
@@ -201,8 +218,13 @@ Parsed Login Details:
     }
   }
 
-  Future<List<Dealer>> getDealerListDetails(String locationId, String categoryId, String monthId) async {
-    final url = '$_baseUrl/dealerlistDetails?ids=$locationId~$categoryId~$monthId';
+  Future<List<Dealer>> getDealerListDetails(
+    String locationId,
+    String categoryId,
+    String monthId,
+  ) async {
+    final url =
+        '$_baseUrl/dealerlistDetails?ids=$locationId~$categoryId~$monthId';
     _log('Dealer List Request: $url');
 
     try {
@@ -212,7 +234,10 @@ Parsed Login Details:
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['myRoot'] != null && data['myRoot'] is List) {
-          final dealers = (data['myRoot'] as List).map<Dealer>((dealerJson) => Dealer.fromJson(dealerJson)).toList();
+          final dealers =
+              (data['myRoot'] as List)
+                  .map<Dealer>((dealerJson) => Dealer.fromJson(dealerJson))
+                  .toList();
           _log('Found ${dealers.length} dealers');
           return dealers;
         } else {
@@ -220,7 +245,9 @@ Parsed Login Details:
           return [];
         }
       } else {
-        throw Exception('Failed to load dealer list. Status code: ${response.statusCode}');
+        throw Exception(
+          'Failed to load dealer list. Status code: ${response.statusCode}',
+        );
       }
     } catch (e) {
       _log('Dealer List Error: $e', isError: true);
@@ -229,21 +256,29 @@ Parsed Login Details:
   }
 
   Future<List<CollectionTarget>> getCollectionTargetListDetails(
-      String userName, int branchId, int monthId, int stateId) async {
-    final url = '$_baseUrl/collectiontargetlistDetails?ids=$userName~$branchId~$monthId~$stateId';
+    String userName,
+    int branchId,
+    int monthId,
+    int stateId,
+  ) async {
+    final url =
+        '$_baseUrl/collectiontargetlistDetails?ids=$userName~$branchId~$monthId~$stateId';
     _log('Collection Targets Request: $url');
 
     try {
       final response = await http.get(Uri.parse(url));
-      _log('Collection Targets Response (${response.statusCode}): ${response.body}');
+      _log(
+        'Collection Targets Response (${response.statusCode}): ${response.body}',
+      );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['myRoot'] != null && data['myRoot'] is List) {
-          final targets = (data['myRoot'] as List)
-              .map((target) => CollectionTarget.fromJson(target))
-              .toList();
-          
+          final targets =
+              (data['myRoot'] as List)
+                  .map((target) => CollectionTarget.fromJson(target))
+                  .toList();
+
           _log('''
 Found ${targets.length} collection targets:
 ${targets.map((t) => '''
@@ -257,7 +292,9 @@ ${targets.map((t) => '''
         }
         return [];
       } else {
-        throw Exception('Failed to load collection target details. Status code: ${response.statusCode}');
+        throw Exception(
+          'Failed to load collection target details. Status code: ${response.statusCode}',
+        );
       }
     } catch (e) {
       _log('Collection Targets Error: $e', isError: true);
@@ -265,13 +302,20 @@ ${targets.map((t) => '''
     }
   }
 
-  Future<dynamic> getDealerOutstandingDetails(String cateId, int branchId) async {
-    final url = Uri.parse('$_baseUrl/dealeroutstandingDetails?ids=$cateId~$branchId');
+  Future<dynamic> getDealerOutstandingDetails(
+    String cateId,
+    int branchId,
+  ) async {
+    final url = Uri.parse(
+      '$_baseUrl/dealeroutstandingDetails?ids=$cateId~$branchId',
+    );
     _log('Dealer Outstanding Request: $url');
 
     try {
       final response = await http.get(url);
-      _log('Dealer Outstanding Response (${response.statusCode}): ${response.body}');
+      _log(
+        'Dealer Outstanding Response (${response.statusCode}): ${response.body}',
+      );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -286,7 +330,70 @@ ${targets.map((t) => '''
     }
   }
 
-  Future<Map<String, dynamic>> saveCollectionPlan(Map<String, dynamic> data) async {
+  Future<List<Branch>> getBranchList(String username, int branchId) async {
+    final url = '$_baseUrl/loginbranchdetails?ids=$username~$branchId';
+    _log('Branch List Request: $url');
+
+    try {
+      final response = await http.get(Uri.parse(url));
+      _log('Branch List Response (${response.statusCode}): ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        _log('Branch List Parsed Data: $data');
+
+        if (data['myRoot'] != null && data['myRoot'] is List) {
+          final branches =
+              (data['myRoot'] as List)
+                  .map((branch) => Branch.fromJson(branch))
+                  .toList();
+          _log('Found ${branches.length} branches for user $username');
+          return branches;
+        } else {
+          _log(
+            'WARNING: myRoot is null or not a List. Data structure: ${data.keys}',
+          );
+          return [];
+        }
+      } else {
+        throw Exception(
+          'Failed to load branch list. Status code: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      _log('Branch List Error: $e', isError: true);
+      rethrow;
+    }
+  }
+
+  Future<List<State>> getBranchStateDetails(int stateId) async {
+    final url = '$_baseUrl/branchstateDetails?id=$stateId';
+    _log('Branch State Details Request: $url');
+    try {
+      final response = await http.get(Uri.parse(url));
+      _log(
+        'Branch State Details Response (${response.statusCode}): ${response.body}',
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['myRoot'] != null && data['myRoot'] is List) {
+          return (data['myRoot'] as List)
+              .map((state) => State.fromJson(state))
+              .toList();
+        }
+        return [];
+      } else {
+        throw Exception('Failed to load branch state details');
+      }
+    } catch (e) {
+      _log('Branch State Details Error: $e', isError: true);
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> saveCollectionPlan(
+    Map<String, dynamic> data,
+  ) async {
     final url = Uri.parse(_saveCollectionUrl);
     _log('Save Collection Plan Request: $url\nData: ${jsonEncode(data)}');
 
@@ -297,17 +404,24 @@ ${targets.map((t) => '''
         body: jsonEncode(data),
       );
 
-      _log('Save Collection Plan Response (${response.statusCode}): ${response.body}');
+      _log(
+        'Save Collection Plan Response (${response.statusCode}): ${response.body}',
+      );
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        
+
         // Additional check for success message in response
-        if (responseData['Message']?.toString().toLowerCase().contains('success') ?? false) {
+        if (responseData['Message']?.toString().toLowerCase().contains(
+              'success',
+            ) ??
+            false) {
           _log('Collection plan saved successfully: $responseData');
           return responseData;
         } else {
-          throw Exception('API returned success status but indicated failure: ${responseData['Message']}');
+          throw Exception(
+            'API returned success status but indicated failure: ${responseData['Message']}',
+          );
         }
       } else {
         // Parse error message if available
