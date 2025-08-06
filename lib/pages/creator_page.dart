@@ -405,6 +405,201 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
     }
   }
 
+  void _showValidationAlert() {
+    debugPrint('_showValidationAlert called');
+
+    // Check which specific fields are missing
+    List<String> missingFields = [];
+
+    if (selectedLocation == null) {
+      missingFields.add('Location');
+    }
+    if (selectedCategory == 'Select Categories') {
+      missingFields.add('Category');
+    }
+    if (selectedMonth == null) {
+      missingFields.add('Month');
+    }
+
+    debugPrint('Missing fields: $missingFields');
+
+    String message;
+    if (missingFields.length == 1) {
+      message = 'Please fill in the ${missingFields.first} field first.';
+    } else if (missingFields.length == 2) {
+      message =
+          'Please fill in the ${missingFields.first} and ${missingFields.last} fields first.';
+    } else {
+      message = 'Please fill in the ${missingFields.join(', ')} fields first.';
+    }
+
+    debugPrint('Alert message: $message');
+
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Prevent dismissing by tapping outside
+      builder:
+          (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.warning, color: Colors.orange),
+                SizedBox(width: 8),
+                Text('Required Fields Missing'),
+              ],
+            ),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  debugPrint('Alert OK button pressed');
+                  Navigator.pop(context);
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Dealer? _getValidDealerValue() {
+    // If no dealer is selected, return null
+    if (selectedDealer == null) return null;
+
+    // Check if the selected dealer is still in the current dealers list
+    final dealerItems = _getDealerItems();
+    final isValid = dealerItems.any(
+      (dealer) => dealer.cateId == selectedDealer!.cateId,
+    );
+
+    // If the selected dealer is not valid anymore, reset it
+    if (!isValid) {
+      selectedDealer = null;
+      return null;
+    }
+
+    return selectedDealer;
+  }
+
+  List<Dealer> _getDealerItems() {
+    final items = [
+      Dealer(cateId: 0, cateName: 'Select Dealer', creditPeriod: 0),
+    ];
+
+    // Add actual dealers if available
+    if (dealers.isNotEmpty) {
+      items.addAll(dealers);
+    }
+
+    return items;
+  }
+
+  Widget _buildDealerDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Dealer',
+          style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: () {
+            debugPrint('Dealer dropdown tapped');
+            debugPrint('Selected Location: $selectedLocation');
+            debugPrint('Selected Category: $selectedCategory');
+            debugPrint('Selected Month: $selectedMonth');
+
+            // Check if required fields are filled before allowing dropdown to open
+            if (selectedLocation == null ||
+                selectedCategory == 'Select Categories' ||
+                selectedMonth == null) {
+              debugPrint('Validation failed on tap - showing alert');
+              _showValidationAlert();
+              return;
+            }
+
+            // If validation passes, show the dropdown
+            _showDealerDropdown();
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _getValidDealerValue()?.cateName ?? 'Select Dealer',
+                    style: TextStyle(
+                      color:
+                          _getValidDealerValue()?.cateId == 0
+                              ? Colors.grey.shade500
+                              : Colors.black,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.arrow_drop_down, color: Colors.grey),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showDealerDropdown() {
+    final RenderBox button = context.findRenderObject() as RenderBox;
+    final RenderBox overlay =
+        Navigator.of(context).overlay!.context.findRenderObject() as RenderBox;
+    final RelativeRect position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        button.localToGlobal(Offset.zero, ancestor: overlay),
+        button.localToGlobal(
+          button.size.bottomRight(Offset.zero),
+          ancestor: overlay,
+        ),
+      ),
+      Offset.zero & overlay.size,
+    );
+
+    showMenu<Dealer>(
+      context: context,
+      position: position,
+      items:
+          _getDealerItems()
+              .map(
+                (dealer) => PopupMenuItem<Dealer>(
+                  value: dealer,
+                  child: Text(dealer.cateName),
+                ),
+              )
+              .toList(),
+    ).then((selectedDealer) async {
+      if (selectedDealer != null) {
+        debugPrint('Dealer selected: ${selectedDealer.cateName}');
+
+        // Check if other required fields are filled before allowing dealer selection
+        if (selectedDealer.cateId != 0 &&
+            (selectedLocation == null ||
+                selectedCategory == 'Select Categories' ||
+                selectedMonth == null)) {
+          debugPrint('Validation failed - showing alert');
+          _showValidationAlert();
+          return;
+        }
+
+        setState(
+          () =>
+              this.selectedDealer =
+                  selectedDealer.cateId == 0 ? null : selectedDealer,
+        );
+        if (this.selectedDealer != null) await fetchDealerOutstanding();
+      }
+    });
+  }
+
   bool _validateForm() {
     if (selectedLocation == null ||
         selectedCategory == 'Select Categories' ||
@@ -674,27 +869,7 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
                   },
                 ),
                 const SizedBox(height: 16),
-                _buildDropdown<Dealer>(
-                  label: 'Dealer',
-                  value: selectedDealer,
-                  items: [
-                    Dealer(
-                      cateId: 0,
-                      cateName: 'Select Dealer',
-                      creditPeriod: 0,
-                    ),
-                    ...dealers,
-                  ],
-                  displayText: (dealer) => dealer?.cateName ?? '',
-                  onChanged: (newValue) async {
-                    setState(
-                      () =>
-                          selectedDealer =
-                              newValue?.cateId == 0 ? null : newValue,
-                    );
-                    if (selectedDealer != null) await fetchDealerOutstanding();
-                  },
-                ),
+                _buildDealerDropdown(),
               ],
             ),
           ),

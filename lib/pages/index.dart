@@ -30,6 +30,13 @@ class _IndexPageState extends State<IndexPage> with TickerProviderStateMixin {
   bool _isLoadingCollectionTargets = false;
   String? _collectionTargetsErrorMessage;
 
+  // Company search functionality
+  final TextEditingController _companySearchController =
+      TextEditingController();
+  List<CollectionTarget> _filteredTargets = [];
+  bool _isSearching = false;
+  CollectionTarget? _selectedCompany;
+
   // 1. Add variable to store state details
   List<state_model.State> _stateDetails = [];
 
@@ -78,6 +85,11 @@ class _IndexPageState extends State<IndexPage> with TickerProviderStateMixin {
     _fadeController.forward();
     _slideController.forward();
 
+    // Add listener to company search controller
+    _companySearchController.addListener(() {
+      setState(() {}); // Trigger rebuild to update clear button visibility
+    });
+
     if (widget.loginDetails?.stateId != null) {
       _fetchStateDetails(widget.loginDetails!.stateId);
     }
@@ -88,6 +100,7 @@ class _IndexPageState extends State<IndexPage> with TickerProviderStateMixin {
   void dispose() {
     _fadeController.dispose();
     _slideController.dispose();
+    _companySearchController.dispose();
     super.dispose();
   }
 
@@ -179,6 +192,11 @@ class _IndexPageState extends State<IndexPage> with TickerProviderStateMixin {
       setState(() {
         _collectionTargets = fetchedTargets;
         _isLoadingCollectionTargets = false;
+        // Clear filtered results when new data is loaded
+        _filteredTargets = [];
+        _isSearching = false;
+        _selectedCompany =
+            null; // Clear selected company when new data is loaded
       });
     } catch (e) {
       setState(() {
@@ -204,6 +222,51 @@ class _IndexPageState extends State<IndexPage> with TickerProviderStateMixin {
   LinearGradient _getCategoryGradient(String categoryCode) {
     final hash = categoryCode.codeUnits.fold(0, (a, b) => a + b);
     return _categoryGradients[hash % _categoryGradients.length];
+  }
+
+  // Company search functionality
+  void _performCompanySearch(String query) {
+    if (query.trim().isEmpty) {
+      setState(() {
+        _filteredTargets = [];
+        _isSearching = false;
+        _selectedCompany =
+            null; // Clear selected company when search is cleared
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+      _selectedCompany = null; // Clear selected company when searching
+      _filteredTargets =
+          _collectionTargets.where((target) {
+            final searchQuery = query.toLowerCase().trim();
+            final companyName = target.cateName.toLowerCase();
+            final companyCode = target.cateCode.toLowerCase();
+
+            return companyName.contains(searchQuery) ||
+                companyCode.contains(searchQuery);
+          }).toList();
+    });
+  }
+
+  void _clearCompanySearch() {
+    _companySearchController.clear();
+    setState(() {
+      _selectedCompany = null;
+      _filteredTargets = [];
+      _isSearching = false;
+    });
+  }
+
+  void _selectCompany(CollectionTarget target) {
+    _companySearchController.text = target.cateName;
+    setState(() {
+      _selectedCompany = target;
+      _filteredTargets = [];
+      _isSearching = false;
+    });
   }
 
   @override
@@ -352,6 +415,12 @@ class _IndexPageState extends State<IndexPage> with TickerProviderStateMixin {
                         children: [
                           _buildMonthSelectorCard(colorScheme, textTheme),
                           const SizedBox(height: 24),
+                          _buildCompanySearchCard(colorScheme, textTheme),
+                          const SizedBox(height: 24),
+                          if (_selectedCompany != null) ...[
+                            _buildSelectedCompanyCard(textTheme),
+                            const SizedBox(height: 24),
+                          ],
                           _buildHeaderStats(colorScheme, textTheme),
                           const SizedBox(height: 24),
                           // State details section
@@ -570,6 +639,130 @@ class _IndexPageState extends State<IndexPage> with TickerProviderStateMixin {
                         }).toList(),
                   ),
                 ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompanySearchCard(ColorScheme colorScheme, TextTheme textTheme) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withOpacity(0.9),
+            Colors.white.withOpacity(0.7),
+          ],
+        ),
+        border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF667eea).withOpacity(0.1),
+            blurRadius: 30,
+            offset: const Offset(0, 15),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF667eea).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.search,
+                    color: Color(0xFF667eea),
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  'SEARCH COMPANY',
+                  style: textTheme.labelLarge?.copyWith(
+                    color: const Color(0xFF667eea),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _companySearchController,
+              onChanged: _performCompanySearch,
+              decoration: InputDecoration(
+                hintText: 'Search by company name or code',
+                hintStyle: textTheme.bodyMedium?.copyWith(
+                  color: Colors.grey.shade600,
+                ),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFF667eea)),
+                suffixIcon:
+                    _companySearchController.text.isNotEmpty
+                        ? IconButton(
+                          icon: const Icon(
+                            Icons.clear,
+                            color: Color(0xFF667eea),
+                          ),
+                          onPressed: _clearCompanySearch,
+                        )
+                        : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.8),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_isSearching && _filteredTargets.isNotEmpty)
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _filteredTargets.length,
+                itemBuilder: (context, index) {
+                  final target = _filteredTargets[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: _CompanySearchResultItem(
+                      target: target,
+                      onSelect: () {
+                        _selectCompany(target);
+                      },
+                    ),
+                  );
+                },
+              ),
+            if (_isSearching && _filteredTargets.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  'No results found for "${_companySearchController.text}"',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -855,6 +1048,379 @@ class _IndexPageState extends State<IndexPage> with TickerProviderStateMixin {
                   ),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectedCompanyCard(TextTheme textTheme) {
+    if (_selectedCompany == null) return const SizedBox.shrink();
+
+    final target = _selectedCompany!;
+    final categoryGradient = _getCategoryGradient(target.cateCode);
+    final double progress =
+        target.hamt1 > 0 ? (target.hamt2 / target.hamt1) : 0.0;
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withOpacity(0.95),
+            Colors.white.withOpacity(0.8),
+          ],
+        ),
+        border: Border.all(
+          color: categoryGradient.colors.first.withOpacity(0.3),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: categoryGradient.colors.first.withOpacity(0.15),
+            blurRadius: 30,
+            offset: const Offset(0, 15),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: categoryGradient,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.business,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'SELECTED COMPANY',
+                        style: textTheme.labelLarge?.copyWith(
+                          color: const Color(0xFF667eea),
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        target.cateName,
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: _clearCompanySearch,
+                  icon: const Icon(Icons.close, color: Color(0xFF667eea)),
+                  tooltip: 'Clear Selection',
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withOpacity(0.9),
+                    Colors.white.withOpacity(0.7),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: categoryGradient.colors.first.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          target.cateCode,
+                          style: textTheme.labelMedium?.copyWith(
+                            color: categoryGradient.colors.first,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      if (target.catePName.isNotEmpty)
+                        Expanded(
+                          child: Text(
+                            target.catePName,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      if (target.catePHN3.isNotEmpty) ...[
+                        Icon(
+                          Icons.phone_outlined,
+                          size: 18,
+                          color: categoryGradient.colors.first,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            target.catePHN3,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (target.cateEmail.isNotEmpty) ...[
+                        const SizedBox(width: 16),
+                        Icon(
+                          Icons.email_outlined,
+                          size: 18,
+                          color: categoryGradient.colors.first,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            target.cateEmail,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: Colors.grey.shade700,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: categoryGradient,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Collection Progress',
+                        style: textTheme.labelMedium?.copyWith(
+                          color: Colors.white.withOpacity(0.9),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${(progress * 100).toStringAsFixed(1)}%',
+                          style: textTheme.labelSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  LinearProgressIndicator(
+                    value: progress,
+                    backgroundColor: Colors.white.withOpacity(0.3),
+                    color: Colors.white,
+                    minHeight: 8,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Target',
+                              style: textTheme.labelSmall?.copyWith(
+                                color: Colors.white.withOpacity(0.8),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '₹${target.hamt1.toStringAsFixed(2)}',
+                              style: textTheme.titleMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              'Collected',
+                              style: textTheme.labelSmall?.copyWith(
+                                color: Colors.white.withOpacity(0.8),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '₹${target.hamt2.toStringAsFixed(2)}',
+                              style: textTheme.titleMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final bool? result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (context) =>
+                                  EditClientScreen(tgtplnMid: target.tgtPlnMId),
+                        ),
+                      );
+                      if (result == true) {
+                        if (_selectedMonth != null &&
+                            widget.loginDetails != null) {
+                          final stateId = widget.loginDetails!.stateId;
+                          _fetchCollectionTargets(
+                            widget.loginDetails!.userName,
+                            widget.loginDetails!.brnchId,
+                            _selectedMonth!.monthId,
+                            stateId,
+                          );
+                        }
+                      }
+                    },
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      side: BorderSide(color: categoryGradient.colors.first),
+                    ),
+                    icon: Icon(
+                      Icons.edit_outlined,
+                      size: 18,
+                      color: categoryGradient.colors.first,
+                    ),
+                    label: Text(
+                      'Edit',
+                      style: TextStyle(
+                        color: categoryGradient.colors.first,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (context) => ViewTargetActualScreen(
+                                tgtplnMid: target.tgtPlnMId,
+                              ),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      backgroundColor: categoryGradient.colors.first,
+                    ),
+                    icon: const Icon(
+                      Icons.visibility_outlined,
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                    label: const Text(
+                      'View',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -1650,6 +2216,120 @@ class _ModernAmountIndicator extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CompanySearchResultItem extends StatelessWidget {
+  final CollectionTarget target;
+  final VoidCallback onSelect;
+
+  const _CompanySearchResultItem({
+    required this.target,
+    required this.onSelect,
+  });
+
+  LinearGradient _getCategoryGradient(String categoryCode) {
+    final List<LinearGradient> categoryGradients = [
+      const LinearGradient(colors: [Color(0xFF667eea), Color(0xFF764ba2)]),
+      const LinearGradient(colors: [Color(0xFFf093fb), Color(0xFFf5576c)]),
+      const LinearGradient(colors: [Color(0xFF4facfe), Color(0xFF00f2fe)]),
+      const LinearGradient(colors: [Color(0xFF43e97b), Color(0xFF38f9d7)]),
+      const LinearGradient(colors: [Color(0xFFfa709a), Color(0xFFfee140)]),
+      const LinearGradient(colors: [Color(0xFFa8edea), Color(0xFFfed6e3)]),
+      const LinearGradient(colors: [Color(0xFFff9a9e), Color(0xFFfecfef)]),
+      const LinearGradient(colors: [Color(0xFFffecd2), Color(0xFFfcb69f)]),
+    ];
+    final hash = categoryCode.codeUnits.fold(0, (a, b) => a + b);
+    return categoryGradients[hash % categoryGradients.length];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final categoryGradient = _getCategoryGradient(target.cateCode);
+
+    return GestureDetector(
+      onTap: onSelect,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: categoryGradient,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.category, size: 24, color: Colors.white),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: categoryGradient.colors.first.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          target.cateCode,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: categoryGradient.colors.first,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    target.cateName,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (target.catePName.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        target.catePName,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.grey.shade600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

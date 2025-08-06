@@ -46,7 +46,8 @@ class _EditClientScreenState extends State<EditClientScreen> {
 
   Future<void> fetchEditData() async {
     final url = Uri.parse(
-        'https://fusiontecsoftware.com/shefawebapi/shefaapi/collectiontargeteditDetails?id=${widget.tgtplnMid}');
+      'https://fusiontecsoftware.com/shefawebapi/shefaapi/collectiontargeteditDetails?id=${widget.tgtplnMid}',
+    );
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
@@ -77,14 +78,18 @@ class _EditClientScreenState extends State<EditClientScreen> {
         _formKeys.clear();
 
         for (var item in tempList) {
-          _hamt1Controllers
-              .add(TextEditingController(text: item['TRANHAMT1'].toString()));
-          _hamt2Controllers
-              .add(TextEditingController(text: item['TRANHAMT2'].toString()));
-          _aamt1Controllers
-              .add(TextEditingController(text: item['TRANAAMT1'].toString()));
-          _aamt2Controllers
-              .add(TextEditingController(text: item['TRANAAMT2'].toString()));
+          _hamt1Controllers.add(
+            TextEditingController(text: item['TRANHAMT1'].toString()),
+          );
+          _hamt2Controllers.add(
+            TextEditingController(text: item['TRANHAMT2'].toString()),
+          );
+          _aamt1Controllers.add(
+            TextEditingController(text: item['TRANAAMT1'].toString()),
+          );
+          _aamt2Controllers.add(
+            TextEditingController(text: item['TRANAAMT2'].toString()),
+          );
           _formKeys.add(GlobalKey<FormState>());
         }
 
@@ -94,7 +99,8 @@ class _EditClientScreenState extends State<EditClientScreen> {
         });
       } else {
         throw Exception(
-            "Failed to load edit data. Status code: ${response.statusCode}");
+          "Failed to load edit data. Status code: ${response.statusCode}",
+        );
       }
     } catch (e) {
       setState(() {
@@ -149,7 +155,7 @@ class _EditClientScreenState extends State<EditClientScreen> {
 
     try {
       final List<Map<String, dynamic>> updateData = [];
-      
+
       for (int i = 0; i < transactionList.length; i++) {
         updateData.add({
           'TGTPLNDID': transactionList[i]['TGTPLNDID'],
@@ -161,16 +167,14 @@ class _EditClientScreenState extends State<EditClientScreen> {
         });
       }
 
-      final requestBody = {
-        'updatecollectionDetails': updateData,
-      };
+      final requestBody = {'updatecollectionDetails': updateData};
 
-      final url = Uri.parse('https://fusiontecsoftware.com/shefawebapi/api/collectiontargetupdate/update');
+      final url = Uri.parse(
+        'https://fusiontecsoftware.com/shefawebapi/api/collectiontargetupdate/update',
+      );
       final response = await http.post(
         url,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: {'Content-Type': 'application/json'},
         body: json.encode(requestBody),
       );
 
@@ -183,7 +187,9 @@ class _EditClientScreenState extends State<EditClientScreen> {
         );
         Navigator.of(context).pop(true);
       } else {
-        throw Exception("Failed to save data. Status code: ${response.statusCode}");
+        throw Exception(
+          "Failed to save data. Status code: ${response.statusCode}",
+        );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -200,10 +206,10 @@ class _EditClientScreenState extends State<EditClientScreen> {
   }
 
   Widget _buildEditableField(
-    String label, 
-    TextEditingController controller, 
-    {double? tranNAmt, 
-    TextEditingController? otherController, 
+    String label,
+    TextEditingController controller, {
+    double? tranNAmt,
+    TextEditingController? otherController,
     required int index,
     bool isActualField = false,
     TextEditingController? actualOtherController,
@@ -249,10 +255,7 @@ class _EditClientScreenState extends State<EditClientScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(
-                  color: Colors.blue,
-                  width: 1.0,
-                ),
+                borderSide: const BorderSide(color: Colors.blue, width: 1.0),
               ),
             ),
             validator: (value) {
@@ -263,11 +266,12 @@ class _EditClientScreenState extends State<EditClientScreen> {
                   return 'Sum exceeds total amount (₹$tranNAmt)';
                 }
               }
-              
+
               // Additional validation for actual amounts
               if (isActualField && actualOtherController != null) {
                 final actual1 = double.tryParse(controller.text) ?? 0;
-                final actual2 = double.tryParse(actualOtherController.text) ?? 0;
+                final actual2 =
+                    double.tryParse(actualOtherController.text) ?? 0;
                 if (actual1 + actual2 > tranNAmt!) {
                   return 'Actual sum exceeds net amount (₹$tranNAmt)';
                 }
@@ -349,10 +353,7 @@ class _EditClientScreenState extends State<EditClientScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    cardColor,
-                    cardColor.withOpacity(0.8),
-                  ],
+                  colors: [cardColor, cardColor.withOpacity(0.8)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -373,7 +374,10 @@ class _EditClientScreenState extends State<EditClientScreen> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(10),
@@ -390,7 +394,7 @@ class _EditClientScreenState extends State<EditClientScreen> {
                 ],
               ),
             ),
-            
+
             // Content
             Padding(
               padding: const EdgeInsets.all(12),
@@ -405,24 +409,33 @@ class _EditClientScreenState extends State<EditClientScreen> {
                     ),
                     child: Column(
                       children: [
-                        _buildInfoRow("Net Amount", '₹$tranNAmt', 
-                            valueColor: Colors.green.shade700),
-                        _buildInfoRow("Paid Amount", '₹${item['TRANPAMT']}', 
-                            valueColor: Colors.blue.shade700),
-                        _buildInfoRow("Due Days", '${item['TRANODAYS']} days', 
-                            valueColor: Colors.orange.shade700),
+                        _buildInfoRow(
+                          "Net Amount",
+                          '₹$tranNAmt',
+                          valueColor: Colors.green.shade700,
+                        ),
+                        _buildInfoRow(
+                          "Pending Amount",
+                          '₹${item['TRANPAMT']}',
+                          valueColor: Colors.blue.shade700,
+                        ),
+                        _buildInfoRow(
+                          "Due Days",
+                          '${item['TRANODAYS']} days',
+                          valueColor: Colors.orange.shade700,
+                        ),
                       ],
                     ),
                   ),
-                  
+
                   const SizedBox(height: 8),
-                  
+
                   // Editable fields in a compact grid
                   Row(
                     children: [
                       Expanded(
                         child: _buildEditableField(
-                          "Plan 1st Half", 
+                          "Plan 1st Half",
                           _hamt1Controllers[index],
                           tranNAmt: tranNAmt,
                           otherController: _hamt2Controllers[index],
@@ -432,7 +445,7 @@ class _EditClientScreenState extends State<EditClientScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _buildEditableField(
-                          "Plan 2nd Half", 
+                          "Plan 2nd Half",
                           _hamt2Controllers[index],
                           tranNAmt: tranNAmt,
                           otherController: _hamt1Controllers[index],
@@ -445,7 +458,7 @@ class _EditClientScreenState extends State<EditClientScreen> {
                     children: [
                       Expanded(
                         child: _buildEditableField(
-                          "Actual 1st Half", 
+                          "Actual 1st Half",
                           _aamt1Controllers[index],
                           tranNAmt: tranNAmt,
                           index: index,
@@ -456,7 +469,7 @@ class _EditClientScreenState extends State<EditClientScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _buildEditableField(
-                          "Actual 2nd Half", 
+                          "Actual 2nd Half",
                           _aamt2Controllers[index],
                           tranNAmt: tranNAmt,
                           index: index,
@@ -466,7 +479,7 @@ class _EditClientScreenState extends State<EditClientScreen> {
                       ),
                     ],
                   ),
-                  
+
                   // Created by info
                   Align(
                     alignment: Alignment.centerRight,
@@ -510,10 +523,7 @@ class _EditClientScreenState extends State<EditClientScreen> {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Colors.blue.shade700,
-                Colors.blue.shade500,
-              ],
+              colors: [Colors.blue.shade700, Colors.blue.shade500],
             ),
           ),
         ),
@@ -530,71 +540,65 @@ class _EditClientScreenState extends State<EditClientScreen> {
             ),
         ],
       ),
-      body: _isLoading
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue.shade700),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    "Loading collection data...",
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : transactionList.isEmpty
+      body:
+          _isLoading
               ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.receipt_long,
-                        size: 48,
-                        color: Colors.grey[400],
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.blue.shade700,
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        "No collection plan data found",
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                )
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      "Loading collection data...",
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
+                  ],
+                ),
+              )
+              : transactionList.isEmpty
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.receipt_long, size: 48, color: Colors.grey[400]),
+                    const SizedBox(height: 16),
+                    Text(
+                      "No collection plan data found",
+                      style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              )
               : SingleChildScrollView(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    children: [
-                      ...List.generate(
-                        transactionList.length,
-                        (index) => _buildTransactionCard(index),
-                      ),
-                      const SizedBox(height: 12),
-                      if (transactionList.isNotEmpty)
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: _isLoading ? null : saveEditedData,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue.shade700,
-                              foregroundColor: Colors.white,
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  children: [
+                    ...List.generate(
+                      transactionList.length,
+                      (index) => _buildTransactionCard(index),
+                    ),
+                    const SizedBox(height: 12),
+                    if (transactionList.isNotEmpty)
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _isLoading ? null : saveEditedData,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue.shade700,
+                            foregroundColor: Colors.white,
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            icon: _isLoading
-                                ? const SizedBox(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          icon:
+                              _isLoading
+                                  ? const SizedBox(
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
@@ -602,20 +606,20 @@ class _EditClientScreenState extends State<EditClientScreen> {
                                       color: Colors.white,
                                     ),
                                   )
-                                : const Icon(Icons.save_alt, size: 20),
-                            label: Text(
-                              _isLoading ? "SAVING..." : "SAVE ALL CHANGES",
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
+                                  : const Icon(Icons.save_alt, size: 20),
+                          label: Text(
+                            _isLoading ? "SAVING..." : "SAVE ALL CHANGES",
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
-                      const SizedBox(height: 16),
-                    ],
-                  ),
+                      ),
+                    const SizedBox(height: 16),
+                  ],
                 ),
+              ),
     );
   }
 }
