@@ -19,6 +19,7 @@ class _EditClientScreenState extends State<EditClientScreen> {
   final List<TextEditingController> _hamt2Controllers = [];
   final List<TextEditingController> _aamt1Controllers = [];
   final List<TextEditingController> _aamt2Controllers = [];
+  final List<TextEditingController> _remarksControllers = [];
   final List<GlobalKey<FormState>> _formKeys = [];
 
   @override
@@ -39,6 +40,9 @@ class _EditClientScreenState extends State<EditClientScreen> {
       controller.dispose();
     }
     for (var controller in _aamt2Controllers) {
+      controller.dispose();
+    }
+    for (var controller in _remarksControllers) {
       controller.dispose();
     }
     super.dispose();
@@ -70,11 +74,15 @@ class _EditClientScreenState extends State<EditClientScreen> {
         for (var controller in _aamt2Controllers) {
           controller.dispose();
         }
+        for (var controller in _remarksControllers) {
+          controller.dispose();
+        }
 
         _hamt1Controllers.clear();
         _hamt2Controllers.clear();
         _aamt1Controllers.clear();
         _aamt2Controllers.clear();
+        _remarksControllers.clear();
         _formKeys.clear();
 
         for (var item in tempList) {
@@ -89,6 +97,11 @@ class _EditClientScreenState extends State<EditClientScreen> {
           );
           _aamt2Controllers.add(
             TextEditingController(text: item['TRANAAMT2'].toString()),
+          );
+          _remarksControllers.add(
+            TextEditingController(
+              text: item['TRAND_REMARKS']?.toString() ?? '',
+            ),
           );
           _formKeys.add(GlobalKey<FormState>());
         }
@@ -163,6 +176,7 @@ class _EditClientScreenState extends State<EditClientScreen> {
           'TRANHAMT2': double.tryParse(_hamt2Controllers[i].text) ?? 0,
           'TRANAAMT1': double.tryParse(_aamt1Controllers[i].text) ?? 0,
           'TRANAAMT2': double.tryParse(_aamt2Controllers[i].text) ?? 0,
+          'TRAND_REMARKS': _remarksControllers[i].text.trim(),
           'CUSRID': transactionList[i]['CUSRID'] ?? 'admin',
         });
       }
@@ -286,6 +300,53 @@ class _EditClientScreenState extends State<EditClientScreen> {
                 _formKeys[index].currentState?.validate();
               }
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRemarksField(int index) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Remarks",
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+            ),
+          ),
+          const SizedBox(height: 4),
+          TextFormField(
+            controller: _remarksControllers[index],
+            maxLines: 2,
+            style: const TextStyle(
+              color: Colors.black,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Enter remarks',
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+              filled: true,
+              fillColor: Colors.grey[100],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.blue, width: 1.0),
+              ),
+            ),
           ),
         ],
       ),
@@ -424,6 +485,13 @@ class _EditClientScreenState extends State<EditClientScreen> {
                           '${item['TRANODAYS']} days',
                           valueColor: Colors.orange.shade700,
                         ),
+                        _buildInfoRow(
+                          "Remarks",
+                          (item['TRAND_REMARKS'] ?? '').toString().isEmpty
+                              ? 'N/A'
+                              : item['TRAND_REMARKS'].toString(),
+                          valueColor: Colors.purple.shade700,
+                        ),
                       ],
                     ),
                   ),
@@ -479,6 +547,7 @@ class _EditClientScreenState extends State<EditClientScreen> {
                       ),
                     ],
                   ),
+                  _buildRemarksField(index),
 
                   // Created by info
                   Align(

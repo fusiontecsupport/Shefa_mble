@@ -119,6 +119,12 @@ class _ViewTargetActualScreenState extends State<ViewTargetActualScreen> {
             const SizedBox(height: 12),
             _buildDivider(),
             _buildInfoRow('Overdue Days', '${txn['TRANODAYS']}'),
+            _buildInfoRow(
+              'Remarks',
+              (txn['TRAND_REMARKS'] ?? '').toString().isEmpty
+                  ? 'N/A'
+                  : txn['TRAND_REMARKS'].toString(),
+            ),
             _buildInfoRow('User ID', txn['CUSRID']),
           ],
         ),
