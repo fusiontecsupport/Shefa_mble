@@ -51,6 +51,7 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
   List<Map<String, dynamic>> dealerOutstandingList = [];
   List<TextEditingController> firstHalfControllers = [];
   List<TextEditingController> secondHalfControllers = [];
+  List<TextEditingController> remarksControllers = [];
 
   @override
   void initState() {
@@ -81,7 +82,11 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
   }
 
   void _cleanupControllers() {
-    for (var c in [...firstHalfControllers, ...secondHalfControllers]) {
+    for (var c in [
+      ...firstHalfControllers,
+      ...secondHalfControllers,
+      ...remarksControllers,
+    ]) {
       c.dispose();
     }
   }
@@ -307,23 +312,23 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
         "cusrid": usernameFromLogin ?? widget.username,
       },
       "outstandingDetails":
-          dealerOutstandingList.asMap().entries.map((entry) {
-            final index = entry.key;
-            final item = entry.value;
-
-            return {
-              "TRANMID": item['TRANMID'],
-              "TRANDNO": item['TRANDNO'].toString(),
-              "TRANDATE": item['TRANDATE'].toString(),
-              "TRANNAMT": _convertToDouble(item['TRANNAMT']),
-              "TRANPAMT": _convertToDouble(item['TRANPAMT']),
-              "TRANODAYS": item['OverDueDays'] ?? 0,
-              "firstHalfAmount":
-                  _parseAmount(firstHalfControllers[index].text) ?? 0.0,
-              "secondHalfAmount":
-                  _parseAmount(secondHalfControllers[index].text) ?? 0.0,
-            };
-          }).toList(),
+          [
+            for (final entry in dealerOutstandingList.asMap().entries)
+              {
+                "TRANMID": entry.value['TRANMID'],
+                "TRANDNO": entry.value['TRANDNO'].toString(),
+                "TRANDATE": entry.value['TRANDATE'].toString(),
+                "TRANNAMT": _convertToDouble(entry.value['TRANNAMT']),
+                "TRANPAMT": _convertToDouble(entry.value['TRANPAMT']),
+                "TRANODAYS": entry.value['OverDueDays'] ?? 0,
+                "firstHalfAmount":
+                    _parseAmount(firstHalfControllers[entry.key].text) ?? 0.0,
+                "secondHalfAmount":
+                    _parseAmount(secondHalfControllers[entry.key].text) ??
+                    0.0,
+                "TRAND_REMARKS": remarksControllers[entry.key].text.trim(),
+              },
+          ],
     };
   }
 
@@ -384,6 +389,10 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
       (_) => TextEditingController(),
     );
     secondHalfControllers = List.generate(
+      dealerOutstandingList.length,
+      (_) => TextEditingController(),
+    );
+    remarksControllers = List.generate(
       dealerOutstandingList.length,
       (_) => TextEditingController(),
     );
@@ -1359,6 +1368,8 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            _buildRemarksField(index),
           ],
         ),
       ),
@@ -1474,6 +1485,32 @@ class _CollectionPlanPageState extends State<CollectionPlanPage> {
           ), // Allow decimals
           decoration: InputDecoration(
             hintText: '0.00',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRemarksField(int index) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Remarks', style: TextStyle(color: Colors.grey.shade600)),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: remarksControllers[index],
+          maxLines: 2,
+          textInputAction: TextInputAction.newline,
+          decoration: InputDecoration(
+            hintText: 'Enter remarks',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey.shade300),
